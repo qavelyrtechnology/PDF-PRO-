@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#e11d48"/>
+      <stop offset="50%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="shadow" x="80" y="80" width="352" height="360" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- Main Document Shape -->
+  <g filter="url(#shadow)">
+    <path d="M160 110C160 98.9543 168.954 90 180 90H280L352 162V390C352 401.046 343.046 410 332 410H180C168.954 410 160 401.046 160 390V110Z" fill="#ffffff"/>
+    <path d="M280 90V152C280 157.523 284.477 162 290 162H352L280 90Z" fill="#ffe4e6"/>
+    <!-- PDF Text Lines -->
+    <rect x="195" y="210" width="122" height="18" rx="9" fill="#f43f5e"/>
+    <rect x="195" y="246" width="90" height="14" rx="7" fill="#cbd5e1"/>
+    <rect x="195" y="274" width="110" height="14" rx="7" fill="#cbd5e1"/>
+    <!-- PDF Badge -->
+    <rect x="195" y="318" width="60" height="24" rx="6" fill="#e11d48"/>
+    <text x="203" y="335" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="800" fill="#ffffff">PDF</text>
+  </g>
+</svg>
