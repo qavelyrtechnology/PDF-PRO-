@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
+import { BrandMark } from '../components/BrandMark';
 import {
   FileText,
   Layers,
@@ -16,8 +17,6 @@ import {
   Zap,
   CheckCircle2,
   ArrowRight,
-  ShieldAlert,
-  Sparkles,
   LayoutGrid,
   Hash,
   Stamp,
@@ -247,90 +246,100 @@ export const HomePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-16 py-8 sm:py-12">
-      {/* Hero Section */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-6">
-        {/* Trust Pill */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 text-xs font-semibold text-rose-700 dark:text-rose-300 shadow-xs">
-          <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
-          <span>{t.home.heroBadge}</span>
-        </div>
+    <div className="space-y-16 pb-12">
+      {/* Architectural Studio Split Hero */}
+      <section className="studio-grid-surface border-b border-slate-200/80 dark:border-slate-800/80 py-10 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Brand Narrative & Primary Actions */}
+          <div className="lg:col-span-7 space-y-6 text-start">
+            <div className="inline-flex items-center gap-3">
+              <BrandMark size="md" />
+              <div className="text-xs font-semibold tracking-wide text-rose-700 dark:text-rose-400">
+                {t.home.heroBadge}
+              </div>
+            </div>
 
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.15]">
-          {t.home.heroTitle}{' '}
-          <span className="bg-gradient-to-r from-rose-600 via-amber-500 to-rose-500 bg-clip-text text-transparent">
-            {t.home.heroTitleHighlight}
-          </span>
-        </h1>
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.15]">
+              {t.home.heroTitle}{' '}
+              <span className="text-rose-600 dark:text-rose-400">
+                {t.home.heroTitleHighlight}
+              </span>
+            </h1>
 
-        <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
-          {t.home.heroSubtitle}
-        </p>
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-2xl leading-relaxed">
+              {t.home.heroSubtitle}
+            </p>
 
-        {/* Feature Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            {t.home.privacyPill}
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50">
-            <Zap className="w-3.5 h-3.5" />
-            {t.home.offlinePill}
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50">
-            <Sparkles className="w-3.5 h-3.5" />
-            {t.home.freePill}
-          </span>
-        </div>
+            {/* Clean Unboxed Trust Markers */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                {t.home.privacyPill}
+              </span>
+              <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                {t.home.offlinePill}
+              </span>
+              <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-700 dark:text-slate-300 shrink-0" />
+                {t.home.freePill}
+              </span>
+            </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-          <Link
-            to="/tools"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-md shadow-rose-600/20 hover:shadow-lg hover:shadow-rose-600/30 transition-all"
-          >
-            <span>{t.home.getStartedBtn}</span>
-            <ArrowRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
-          </Link>
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                to="/tools"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm shadow-sm shadow-rose-600/20 whitespace-nowrap shrink-0 transition-colors"
+              >
+                <span>{t.home.getStartedBtn}</span>
+                <ArrowRight className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
+              </Link>
 
-          <button
-            type="button"
-            onClick={openCommandPalette}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 transition-all shadow-xs"
-          >
-            <Search className="w-4 h-4 text-rose-500" />
-            <span>{language === 'ar' ? 'بحث سريع بالأدوات' : 'Search Tools'}</span>
-            <kbd className="hidden sm:inline-block text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400">
-              ⌘K
-            </kbd>
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold text-sm border border-slate-200 dark:border-slate-700 whitespace-nowrap shrink-0 transition-colors"
+              >
+                <Search className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                <span>{language === 'ar' ? 'بحث سريع بالأدوات' : 'Search Tools'}</span>
+                <kbd className="hidden sm:inline-block text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                  ⌘K
+                </kbd>
+              </button>
+            </div>
+          </div>
 
-        {/* Fast Drop Zone on Home */}
-        <div className="max-w-2xl mx-auto pt-6">
-          <DropZone
-            onFilesSelected={handleQuickDrop}
-            promptText={
-              language === 'ar'
-                ? 'أفلت أي مستند PDF هنا للمعاينة الفورية والبدء بالعمل عليه'
-                : 'Drop any PDF file here to inspect, read, or process immediately'
-            }
-            allowedFormatsText="PDF"
-            multiple={true}
-          />
+          {/* Immediate Workbench Drop Zone */}
+          <div className="lg:col-span-5">
+            <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-sm">
+              <DropZone
+                onFilesSelected={handleQuickDrop}
+                promptText={
+                  language === 'ar'
+                    ? 'أفلت أي مستند PDF هنا للمعاينة الفورية والبدء بالعمل عليه'
+                    : 'Drop any PDF file here to inspect, read, or process immediately'
+                }
+                allowedFormatsText="PDF"
+                multiple={true}
+              />
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Tools Grid Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
               {t.home.quickToolsTitle}
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {language === 'ar'
-                ? 'كل ما تحتاجه للتعامل مع ملفات PDF في مكان واحد مجاني 100%'
+                ? 'كل ما تحتاجه للتعامل مع ملفات PDF في مساحة عمل موحدة ومجانية 100%'
                 : 'Everything you need to read, edit, convert, and secure PDF documents'}
             </p>
           </div>
@@ -340,11 +349,12 @@ export const HomePage: React.FC = () => {
             {categories.map((cat) => (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setActiveCategory(cat.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
                   activeCategory === cat.id
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                    ? 'bg-slate-900 dark:bg-rose-600 text-white'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
                 }`}
               >
                 {cat.name}
@@ -360,16 +370,14 @@ export const HomePage: React.FC = () => {
               <Link
                 key={tool.path}
                 to={tool.path}
-                className="group relative flex flex-col justify-between p-5 rounded-2xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 hover:border-rose-400 dark:hover:border-rose-500 shadow-xs hover:shadow-lg transition-all hover:-translate-y-0.5"
+                className="group relative flex flex-col justify-between p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-rose-400 dark:hover:border-rose-500/70 transition-all hover:-translate-y-0.5"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-3.5">
-                    <div
-                      className={`w-11 h-11 rounded-xl bg-gradient-to-tr ${tool.color} flex items-center justify-center text-white shadow-sm group-hover:scale-105 transition-transform`}
-                    >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/70 text-slate-700 dark:text-slate-200 group-hover:bg-rose-600 group-hover:border-rose-600 group-hover:text-white flex items-center justify-center transition-colors">
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                    <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
                       {tool.badge}
                     </span>
                   </div>
@@ -377,12 +385,12 @@ export const HomePage: React.FC = () => {
                   <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
                     {tool.title}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed line-clamp-2">
                     {tool.desc}
                   </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs font-semibold text-rose-600 dark:text-rose-400">
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-semibold text-rose-600 dark:text-rose-400">
                   <span>{language === 'ar' ? 'افتح الأداة' : 'Open Tool'}</span>
                   <ArrowRight
                     className={`w-4 h-4 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform ${
@@ -397,7 +405,7 @@ export const HomePage: React.FC = () => {
       </section>
 
       {/* Why Free PDF Studio Section */}
-      <section className="bg-slate-100/70 dark:bg-slate-900/60 border-y border-slate-200/80 dark:border-slate-800 py-16">
+      <section className="bg-slate-100/70 dark:bg-slate-900/50 border-y border-slate-200/80 dark:border-slate-800 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center space-y-2">
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
@@ -409,8 +417,8 @@ export const HomePage: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
                 <Lock className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
@@ -421,8 +429,8 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
                 <Zap className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
@@ -433,9 +441,9 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">
                 {t.home.featureFreeTitle}
@@ -445,8 +453,8 @@ export const HomePage: React.FC = () => {
               </p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center">
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-base text-slate-900 dark:text-white">

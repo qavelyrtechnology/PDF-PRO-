@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+import { BrandMark } from '../components/BrandMark';
 import {
   FileText,
   Layers,
@@ -22,7 +23,6 @@ import {
   Columns2,
   Archive,
   AlignJustify,
-  Sparkles,
 } from 'lucide-react';
 
 export const ToolsDirectory: React.FC = () => {
@@ -247,9 +247,11 @@ export const ToolsDirectory: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Page Header */}
       <div className="text-center space-y-3 max-w-2xl mx-auto">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-900/50">
-          <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-          <span>{language === 'ar' ? '19 أداة بي دي إف احترافية مجانية' : '19 Professional Free PDF Tools'}</span>
+        <div className="inline-flex items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-400">
+          <BrandMark size="sm" />
+          <span className="tabular-nums">
+            {language === 'ar' ? '19 أداة PDF مجانية تعمل محلياً' : '19 Local-First PDF Tools'}
+          </span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           {t.nav.tools}
@@ -277,24 +279,25 @@ export const ToolsDirectory: React.FC = () => {
           />
         </div>
 
-        {/* Categories Chips */}
+        {/* Categories Switcher */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
           {categories.map((cat) => (
             <button
               key={cat.id}
+              type="button"
               onClick={() => setSelectedCategory(cat.id as any)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
                 selectedCategory === cat.id
-                  ? 'bg-rose-600 text-white shadow-sm'
-                  : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-750'
+                  ? 'bg-slate-900 dark:bg-rose-600 text-white'
+                  : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               <span>{cat.name}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                className={`text-[11px] font-mono tabular-nums ${
                   selectedCategory === cat.id
-                    ? 'bg-white/20 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    ? 'text-white/80'
+                    : 'text-slate-400 dark:text-slate-500'
                 }`}
               >
                 {cat.count}
@@ -331,15 +334,15 @@ export const ToolsDirectory: React.FC = () => {
               <Link
                 key={tool.id}
                 to={tool.path}
-                className="group relative flex flex-col justify-between p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-750 shadow-xs hover:shadow-lg hover:border-rose-400 dark:hover:border-rose-500/50 transition-all hover:-translate-y-0.5"
+                className="group relative flex flex-col justify-between p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:border-rose-400 dark:hover:border-rose-500/60 transition-all hover:-translate-y-0.5"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-50 to-rose-100 dark:from-rose-950/60 dark:to-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/70 text-slate-700 dark:text-slate-200 group-hover:bg-rose-600 group-hover:border-rose-600 group-hover:text-white flex items-center justify-center transition-colors">
                       <Icon className="w-5 h-5" />
                     </div>
                     {tool.badge && (
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
+                      <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
                         {tool.badge}
                       </span>
                     )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
-import { Info, HelpCircle, Code, Cpu, ShieldCheck, Heart } from 'lucide-react';
+import { BrandMark } from '../components/BrandMark';
+import { HelpCircle, Cpu, ShieldCheck } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   const { t } = useLanguage();
@@ -38,7 +39,10 @@ export const AboutPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
       {/* Header */}
-      <div className="text-center space-y-3 max-w-2xl mx-auto">
+      <div className="text-center space-y-4 max-w-2xl mx-auto">
+        <div className="flex justify-center">
+          <BrandMark size="lg" />
+        </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
           {t.about.title}
         </h1>
@@ -48,9 +52,9 @@ export const AboutPage: React.FC = () => {
       </div>
 
       {/* Mission */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs space-y-4">
+      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
         <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400 font-bold text-lg">
-          <Heart className="w-6 h-6" />
+          <ShieldCheck className="w-6 h-6" />
           <h2>{t.about.missionTitle}</h2>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -74,13 +78,13 @@ export const AboutPage: React.FC = () => {
           {technologies.map((tech) => (
             <div
               key={tech.name}
-              className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1.5"
+              className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="font-bold text-sm text-slate-900 dark:text-white font-mono">
                   {tech.name}
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                <span className="text-[11px] font-mono text-rose-600 dark:text-rose-400">
                   {tech.badge}
                 </span>
               </div>

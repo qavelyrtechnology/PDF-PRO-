@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
-import { FileText, Shield, Heart, Cpu, CheckCircle } from 'lucide-react';
+import { BrandMark } from './BrandMark';
+import { Shield, Cpu, CheckCircle } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -12,14 +13,12 @@ export const Footer: React.FC = () => {
       <div className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200/60 dark:border-slate-800/80 py-3 px-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-emerald-500 shrink-0" />
+            <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span className="font-medium">{t.footer.clientSideNotice}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              {t.home.offlinePill}
-            </span>
+          <div className="flex items-center gap-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>{t.home.offlinePill}</span>
           </div>
         </div>
       </div>
@@ -28,11 +27,9 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-8">
           {/* Column 1: Brand & Mission */}
           <div className="sm:col-span-2 md:col-span-1 space-y-4">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-rose-600 flex items-center justify-center text-white">
-                <FileText className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-base text-slate-900 dark:text-white">
+            <Link to="/" className="flex items-center gap-2.5">
+              <BrandMark size="sm" />
+              <span className="font-bold text-base text-slate-900 dark:text-white whitespace-nowrap">
                 {t.appName}
               </span>
             </Link>
@@ -222,10 +219,10 @@ export const Footer: React.FC = () => {
 
         <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
           <p>{t.footer.allRightsReserved}</p>
-          <p className="flex items-center gap-1">
-            <span>Free & Open Web Experience</span>
-            <span>•</span>
-            <span className="text-rose-500">❤️</span>
+          <p className="flex items-center gap-2">
+            <span>{language === 'ar' ? 'معالجة محلية داخل المتصفح' : 'Local-First Document Suite'}</span>
+            <span aria-hidden="true">·</span>
+            <span>{language === 'ar' ? 'العربية / English' : 'EN / AR'}</span>
           </p>
         </div>
       </div>

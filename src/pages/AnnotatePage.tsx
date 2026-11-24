@@ -21,10 +21,7 @@ import {
   ChevronRight,
   Info,
   CheckCircle2,
-  Sparkles,
-  Upload,
   Bookmark,
-  Check,
 } from 'lucide-react';
 
 export const AnnotatePage: React.FC = () => {
@@ -493,9 +490,9 @@ export const AnnotatePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowSigModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white shadow-xs transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 dark:bg-slate-950 hover:bg-rose-600 dark:hover:bg-rose-600 text-white shadow-xs transition-colors"
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <PenTool className="w-3.5 h-3.5" />
                 <span>{t.annotate.signStudio}</span>
               </button>
 
@@ -679,7 +676,7 @@ export const AnnotatePage: React.FC = () => {
           <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500" />
+                <PenTool className="w-5 h-5 text-rose-600" />
                 <span>{t.annotate.signStudio}</span>
               </h3>
               <button
@@ -811,7 +808,7 @@ export const AnnotatePage: React.FC = () => {
               <div className="space-y-4">
                 <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-900 dark:text-emerald-200 space-y-1">
                   <p className="font-semibold flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-emerald-600" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     <span>{t.annotate.removeWhiteBg}</span>
                   </p>
                   <p className="opacity-90">

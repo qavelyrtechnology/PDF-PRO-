@@ -1,11 +1,14 @@
 @import "tailwindcss";
 
-@variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
     --font-latin: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --font-arabic: 'Cairo Variable', 'Cairo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --brand-crimson: #e11d48;
+    --brand-crimson-deep: #be123c;
+    --brand-ink: #0f172a;
   }
 
   html[dir="rtl"], body[dir="rtl"] {
@@ -14,6 +17,35 @@
 
   html[dir="ltr"], body[dir="ltr"] {
     font-family: var(--font-latin);
+  }
+
+  /* Tabular numerals across metrics, page counters, and file sizes */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Prevent orphan single-word trailing lines in display headings */
+  h1, h2 {
+    text-wrap: balance;
+  }
+
+  /* Subtle studio drafting-paper surface pattern for hero framing */
+  .studio-grid-surface {
+    background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  .dark .studio-grid-surface {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Smooth custom scrollbars for PDF viewers and lists */

@@ -139,12 +139,12 @@ export const DropZone: React.FC<DropZoneProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs text-slate-400 dark:text-slate-500">
-            <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 font-mono">
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
               {allowedFormatsText || (accept.includes('image') ? 'PNG, JPG, WebP' : 'PDF')}
             </span>
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span aria-hidden="true">·</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
               {t.home.privacyPill}
             </span>
           </div>
