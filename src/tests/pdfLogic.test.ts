@@ -8,6 +8,7 @@ import {
   splitPdfByRanges,
   splitPdfEveryPage,
   inspectAndSanitizeMetadata,
+  extractEmbeddedImages,
   PageRedaction,
 } from '../services/pdfService';
 import { translations } from '../i18n/translations';
@@ -445,3 +446,88 @@ describe('Watermark and Headers/Footers', () => {
     expect(saved.length).toBeGreaterThan(600);
   });
 });
+
+function createValidPng(width: number, height: number): Uint8Array {
+  const crcTable = (() => {
+    const table = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) {
+        c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      }
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+
+  const crc32 = (buf: Buffer) => {
+    let c = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) {
+      c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    }
+    return (c ^ 0xffffffff) >>> 0;
+  };
+
+  const makeChunk = (type: string, data: Buffer) => {
+    const typeBuf = Buffer.from(type, 'ascii');
+    const lenBuf = Buffer.alloc(4);
+    lenBuf.writeUInt32BE(data.length, 0);
+    const crcBuf = Buffer.alloc(4);
+    crcBuf.writeUInt32BE(crc32(Buffer.concat([typeBuf, data])), 0);
+    return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
+  };
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // RGB color type
+
+  const rawRows = Buffer.alloc(height * (1 + width * 3));
+  for (let y = 0; y < height; y++) {
+    const rowStart = y * (1 + width * 3);
+    rawRows[rowStart] = 0; // filter none
+    for (let x = 0; x < width; x++) {
+      const px = rowStart + 1 + x * 3;
+      rawRows[px] = 225;
+      rawRows[px + 1] = 29;
+      rawRows[px + 2] = 72;
+    }
+  }
+  const idat = zlib.deflateSync(rawRows);
+  const sig = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  return new Uint8Array(
+    Buffer.concat([sig, makeChunk('IHDR', ihdr), makeChunk('IDAT', idat), makeChunk('IEND', Buffer.alloc(0))])
+  );
+}
+
+describe('Embedded Image Extraction', () => {
+  it('returns an empty list for a text-only PDF without rendering full pages', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([500, 700]);
+    page.drawText('Pure vector text PDF without any raster images.', { x: 40, y: 650, size: 14 });
+    const bytes = await doc.save();
+    const file = toPdfFile(bytes, 'text_only.pdf');
+
+    const extracted = await extractEmbeddedImages(file);
+    expect(extracted).toEqual([]);
+  });
+
+  it('extracts embedded raster image XObjects from a PDF', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([500, 700]);
+    const pngBytes = createValidPng(2, 2);
+    const embeddedImage = await doc.embedPng(pngBytes);
+    page.drawImage(embeddedImage, { x: 50, y: 500, width: 100, height: 100 });
+    const pdfBytes = await doc.save();
+    const file = toPdfFile(pdfBytes, 'with_image.pdf');
+
+    const extracted = await extractEmbeddedImages(file);
+    expect(extracted.length).toBe(1);
+    expect(extracted[0].width).toBe(2);
+    expect(extracted[0].height).toBe(2);
+    expect(extracted[0].blob.size).toBeGreaterThan(0);
+    expect(extracted[0].filename).toMatch(/^with_image_image_1\.(png|jpg)$/);
+  });
+});
+

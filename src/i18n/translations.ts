@@ -181,6 +181,11 @@ export interface Translations {
     colorBlack: string;
     colorWhite: string;
     clearBoxes: string;
+    undoLast: string;
+    modeDraw: string;
+    modePan: string;
+    marksOnPage: string;
+    touchHint: string;
     burnRedactionBtn: string;
     securityNoticeTitle: string;
     warningPermanent: string;
@@ -610,6 +615,11 @@ export const translations: Record<Language, Translations> = {
       colorBlack: 'Blackout (Solid Black)',
       colorWhite: 'Whiteout (Clean White)',
       clearBoxes: 'Clear Redaction Marks',
+      undoLast: 'Undo Last',
+      modeDraw: 'Draw Redaction',
+      modePan: 'Scroll & Pan',
+      marksOnPage: '{count} mark(s) on page {page}',
+      touchHint: 'On touchscreens, switch to "Scroll & Pan" to scroll the document without drawing.',
       burnRedactionBtn: 'Burn Redactions & Download PDF',
       securityNoticeTitle: 'Secure Pixel Redaction Sanitization',
       warningPermanent: 'Security Notice: Redacted pages are flattened into high-resolution images, permanently destroying hidden text streams and vector glyphs to prevent text extraction.',
@@ -1037,6 +1047,11 @@ export const translations: Record<Language, Translations> = {
       colorBlack: 'تسويد كامل (أسود داكن)',
       colorWhite: 'حجب نظيف (أبيض ناصع)',
       clearBoxes: 'مسح علامات الحجب',
+      undoLast: 'تراجع عن الأخير',
+      modeDraw: 'وضع الرسم والحجب',
+      modePan: 'التمرير والتنقل',
+      marksOnPage: '{count} علامة في صفحة {page}',
+      touchHint: 'على شاشات اللمس، بدّل إلى "التمرير والتنقل" لتحريك الصفحة بحرية دون رسم مربعات.',
       burnRedactionBtn: 'تثبيت الحجب النهائي وتحميل الملف',
       securityNoticeTitle: 'حجب أمني فعلي عبر التسطيح النقطي (Pixel Sanitization)',
       warningPermanent: 'إشعار أمني: الصفحات المحجوبة يتم تسطيحها بالكامل إلى صور نقطية عالية الدقة مع إتلاف طبقات النصوص المتجهة نهائياً من بنية الملف لضمان استحالة استخراجها بأي وسيلة.',

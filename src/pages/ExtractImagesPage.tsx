@@ -1,26 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
-import { extractEmbeddedImages, downloadFile } from '../services/pdfService';
+import { extractEmbeddedImages, downloadFile, ExtractedImageItem } from '../services/pdfService';
 import JSZip from 'jszip';
 import { Image as ImageIcon, Download, Archive } from 'lucide-react';
+
+type ExtractedImageWithUrl = ExtractedImageItem & { url: string };
 
 export const ExtractImagesPage: React.FC = () => {
   const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [images, setImages] = useState<{ filename: string; blob: Blob; url: string }[]>([]);
+  const [images, setImages] = useState<ExtractedImageWithUrl[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const urlsRef = useRef<string[]>([]);
+
+  const clearImages = () => {
+    urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    urlsRef.current = [];
+    setImages([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      urlsRef.current = [];
+    };
+  }, []);
 
   const handleFileSelected = (files: File[]) => {
     if (files.length === 0) return;
     setFile(files[0]);
-    setImages([]);
+    clearImages();
     setErrorMessage(null);
     setSuccessMessage(null);
   };
@@ -31,16 +47,22 @@ export const ExtractImagesPage: React.FC = () => {
     setIsProcessing(true);
     setProgress(5);
     setErrorMessage(null);
+    setSuccessMessage(null);
+    clearImages();
 
     try {
       const extracted = await extractEmbeddedImages(file, (pct) => setProgress(pct));
       if (extracted.length === 0) {
         setErrorMessage(t.extractImages.noImagesFound);
       } else {
-        const withUrls = extracted.map((item) => ({
-          ...item,
-          url: URL.createObjectURL(item.blob),
-        }));
+        const withUrls = extracted.map((item) => {
+          const url = URL.createObjectURL(item.blob);
+          urlsRef.current.push(url);
+          return {
+            ...item,
+            url,
+          };
+        });
         setImages(withUrls);
         setSuccessMessage(
           t.extractImages.foundCount.replace('{count}', extracted.length.toString())
@@ -120,7 +142,7 @@ export const ExtractImagesPage: React.FC = () => {
             size={file.size}
             onRemove={() => {
               setFile(null);
-              setImages([]);
+              clearImages();
             }}
           />
 
@@ -147,7 +169,7 @@ export const ExtractImagesPage: React.FC = () => {
             <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                  Extracted Images ({images.length})
+                  {t.extractImages.foundCount.replace('{count}', images.length.toString())}
                 </h3>
                 <button
                   type="button"
@@ -168,14 +190,22 @@ export const ExtractImagesPage: React.FC = () => {
                     <div className="aspect-square bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center">
                       <img src={img.url} alt={img.filename} className="w-full h-full object-contain" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="truncate max-w-[120px] text-slate-600 dark:text-slate-300">
-                        {img.filename}
-                      </span>
+                    <div className="flex items-center justify-between text-xs gap-1">
+                      <div className="min-w-0">
+                        <span className="block truncate max-w-[120px] text-slate-600 dark:text-slate-300">
+                          {img.filename}
+                        </span>
+                        {img.width && img.height ? (
+                          <span className="block text-[10px] text-slate-400 font-mono">
+                            {img.width}×{img.height}
+                          </span>
+                        ) : null}
+                      </div>
                       <button
                         type="button"
-                        onClick={() => downloadFile(img.blob, img.filename, 'image/png')}
-                        className="p-1 rounded text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                        onClick={() => downloadFile(img.blob, img.filename, img.mimeType)}
+                        className="p-1 rounded text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 shrink-0"
+                        title={t.common.download}
                       >
                         <Download className="w-4 h-4" />
                       </button>

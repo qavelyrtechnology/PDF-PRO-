@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, MouseEvent } from 'react';
+import React, { useState, useRef, useEffect, PointerEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { StatusBanner } from '../components/StatusBanner';
@@ -13,13 +13,14 @@ import {
 import type * as pdfjsLib from 'pdfjs-dist';
 import {
   EyeOff,
-  Download,
   Share2,
   Trash2,
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
-  CheckCircle2,
+  Hand,
+  SquareDashed,
+  Undo2,
 } from 'lucide-react';
 
 export const RedactPage: React.FC = () => {
@@ -30,6 +31,7 @@ export const RedactPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(0);
 
   const [boxColor, setBoxColor] = useState<'black' | 'white'>('black');
+  const [interactionMode, setInteractionMode] = useState<'draw' | 'pan'>('draw');
   // Map of pageIndex -> RedactionRect[]
   const [pageRedactions, setPageRedactions] = useState<Map<number, RedactionRect[]>>(new Map());
 
@@ -53,6 +55,10 @@ export const RedactPage: React.FC = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
     setPageRedactions(new Map());
+    setInteractionMode('draw');
+    setIsSelecting(false);
+    setStartPos(null);
+    setCurrentRect(null);
 
     try {
       const doc = await loadPdfJsDocument(selected);
@@ -118,30 +124,48 @@ export const RedactPage: React.FC = () => {
     }
   };
 
-  // Drag selection handlers
-  const handleMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasPoint = (e: PointerEvent<HTMLCanvasElement>, overlay: HTMLCanvasElement) => {
+    const rect = overlay.getBoundingClientRect();
+    const rawX = (e.clientX - rect.left) * (overlay.width / rect.width);
+    const rawY = (e.clientY - rect.top) * (overlay.height / rect.height);
+    return {
+      x: Math.max(0, Math.min(overlay.width, rawX)),
+      y: Math.max(0, Math.min(overlay.height, rawY)),
+    };
+  };
+
+  // Unified mouse/touch/stylus drag selection handlers
+  const handlePointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (interactionMode !== 'draw') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
     const overlay = overlayCanvasRef.current;
     if (!overlay) return;
-    const rect = overlay.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (overlay.width / rect.width);
-    const y = (e.clientY - rect.top) * (overlay.height / rect.height);
 
+    e.preventDefault();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignore if pointer capture is unavailable
+    }
+
+    const pt = getCanvasPoint(e, overlay);
     setIsSelecting(true);
-    setStartPos({ x, y });
+    setStartPos(pt);
     setCurrentRect(null);
   };
 
-  const handleMouseMove = (e: MouseEvent<HTMLCanvasElement>) => {
-    if (!isSelecting || !startPos || !overlayCanvasRef.current) return;
-    const overlay = overlayCanvasRef.current;
-    const rect = overlay.getBoundingClientRect();
-    const curX = (e.clientX - rect.left) * (overlay.width / rect.width);
-    const curY = (e.clientY - rect.top) * (overlay.height / rect.height);
+  const handlePointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (interactionMode !== 'draw' || !isSelecting || !startPos || !overlayCanvasRef.current) return;
+    e.preventDefault();
 
-    const x = Math.min(startPos.x, curX);
-    const y = Math.min(startPos.y, curY);
-    const w = Math.abs(curX - startPos.x);
-    const h = Math.abs(curY - startPos.y);
+    const overlay = overlayCanvasRef.current;
+    const pt = getCanvasPoint(e, overlay);
+
+    const x = Math.min(startPos.x, pt.x);
+    const y = Math.min(startPos.y, pt.y);
+    const w = Math.abs(pt.x - startPos.x);
+    const h = Math.abs(pt.y - startPos.y);
 
     setCurrentRect({ x, y, w, h });
 
@@ -157,9 +181,24 @@ export const RedactPage: React.FC = () => {
     }
   };
 
-  const handleMouseUp = () => {
+  const releasePointer = (e: PointerEvent<HTMLCanvasElement>) => {
+    try {
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handlePointerUp = (e: PointerEvent<HTMLCanvasElement>) => {
+    releasePointer(e);
+
     if (!isSelecting || !startPos || !currentRect || !overlayCanvasRef.current) {
       setIsSelecting(false);
+      setStartPos(null);
+      setCurrentRect(null);
+      drawOverlayRects();
       return;
     }
     const overlay = overlayCanvasRef.current;
@@ -191,11 +230,35 @@ export const RedactPage: React.FC = () => {
         nextMap.set(currentPage - 1, [...list, newRedaction]);
         return nextMap;
       });
+    } else {
+      drawOverlayRects();
     }
 
     setIsSelecting(false);
     setStartPos(null);
     setCurrentRect(null);
+  };
+
+  const handlePointerCancel = (e: PointerEvent<HTMLCanvasElement>) => {
+    releasePointer(e);
+    setIsSelecting(false);
+    setStartPos(null);
+    setCurrentRect(null);
+    drawOverlayRects();
+  };
+
+  const handleUndoLast = () => {
+    setPageRedactions((prev) => {
+      const list = prev.get(currentPage - 1);
+      if (!list || list.length === 0) return prev;
+      const nextMap = new Map(prev);
+      if (list.length === 1) {
+        nextMap.delete(currentPage - 1);
+      } else {
+        nextMap.set(currentPage - 1, list.slice(0, -1));
+      }
+      return nextMap;
+    });
   };
 
   const handleClearCurrentPage = () => {
@@ -296,7 +359,42 @@ export const RedactPage: React.FC = () => {
         <div className="space-y-4">
           {/* Redaction Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Draw vs Scroll/Pan mode toggle */}
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setInteractionMode('draw')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    interactionMode === 'draw'
+                      ? 'bg-rose-600 text-white shadow-xs'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-600/60'
+                  }`}
+                >
+                  <SquareDashed className="w-3.5 h-3.5" />
+                  <span>{t.redact.modeDraw}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInteractionMode('pan');
+                    setIsSelecting(false);
+                    setStartPos(null);
+                    setCurrentRect(null);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                    interactionMode === 'pan'
+                      ? 'bg-slate-900 dark:bg-slate-950 text-white shadow-xs'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-600/60'
+                  }`}
+                >
+                  <Hand className="w-3.5 h-3.5" />
+                  <span>{t.redact.modePan}</span>
+                </button>
+              </div>
+
+              <span className="hidden sm:inline-block h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
+
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 {t.redact.boxColor}:
               </span>
@@ -327,37 +425,59 @@ export const RedactPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-mono">
-                {currentRedactionsCount} mark(s) on page {currentPage}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                {t.redact.marksOnPage
+                  .replace('{count}', currentRedactionsCount.toString())
+                  .replace('{page}', currentPage.toString())}
               </span>
               {currentRedactionsCount > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearCurrentPage}
-                  className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium flex items-center gap-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t.redact.clearBoxes}</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleUndoLast}
+                    className="p-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium flex items-center gap-1"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span>{t.redact.undoLast}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearCurrentPage}
+                    className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-medium flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{t.redact.clearBoxes}</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
 
-          <p className="text-xs text-slate-500 dark:text-slate-400 px-1">
-            {t.redact.drawBoxHint}
-          </p>
+          <div className="space-y-1 px-1 text-xs text-slate-500 dark:text-slate-400">
+            <p>{t.redact.drawBoxHint}</p>
+            <p>{t.redact.touchHint}</p>
+          </div>
 
           {/* Canvas Viewport */}
-          <div className="flex items-center justify-center p-4 sm:p-8 bg-slate-200/70 dark:bg-slate-950/80 rounded-2xl min-h-[500px] overflow-auto border border-slate-200 dark:border-slate-800 shadow-inner">
+          <div
+            className={`flex items-center justify-center p-4 sm:p-8 bg-slate-200/70 dark:bg-slate-950/80 rounded-2xl min-h-[500px] overflow-auto border border-slate-200 dark:border-slate-800 shadow-inner ${
+              interactionMode === 'pan' ? 'cursor-grab' : ''
+            }`}
+          >
             <div className="relative shadow-2xl rounded-sm overflow-hidden bg-white select-none">
               <canvas ref={bgCanvasRef} className="block max-w-full" />
               <canvas
                 ref={overlayCanvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                className="absolute inset-0 w-full h-full cursor-crosshair"
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                className={`absolute inset-0 w-full h-full ${
+                  interactionMode === 'draw'
+                    ? 'touch-none cursor-crosshair'
+                    : 'pointer-events-none'
+                }`}
               />
             </div>
           </div>

@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { PDFDocument, rgb, degrees, StandardFonts, PDFName } from 'pdf-lib';
+import { PDFDocument, rgb, degrees, StandardFonts, PDFName, PDFRawStream, PDFArray, PDFNumber } from 'pdf-lib';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Configure pdfjs worker locally (no external CDN)
@@ -1291,47 +1291,344 @@ export async function addHeaderAndFooterToPdf(
   return await pdfDoc.save();
 }
 
+export interface ExtractedImageItem {
+  filename: string;
+  blob: Blob;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  pageNumber?: number;
+}
+
+function pdfDecodedImageToCanvas(img: any): HTMLCanvasElement | null {
+  if (!img) return null;
+
+  // Case 1: ImageBitmap directly or wrapped in { bitmap }
+  const bitmap: ImageBitmap | undefined =
+    typeof ImageBitmap !== 'undefined' && img instanceof ImageBitmap
+      ? img
+      : typeof ImageBitmap !== 'undefined' && img?.bitmap instanceof ImageBitmap
+      ? img.bitmap
+      : undefined;
+
+  if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0);
+    return canvas;
+  }
+
+  // Case 2: Raw pixel buffer { data, width, height, kind }
+  const width = Number(img.width || 0);
+  const height = Number(img.height || 0);
+  const data = img.data as Uint8ClampedArray | Uint8Array | undefined;
+  if (!data || width <= 0 || height <= 0) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const pixelCount = width * height;
+
+  if (img.kind === pdfjsLib.ImageKind.RGBA_32BPP || data.length === pixelCount * 4) {
+    rgba.set(data.subarray(0, pixelCount * 4));
+  } else if (img.kind === pdfjsLib.ImageKind.RGB_24BPP || data.length === pixelCount * 3) {
+    for (let p = 0, s = 0, d = 0; p < pixelCount; p++, s += 3, d += 4) {
+      rgba[d] = data[s];
+      rgba[d + 1] = data[s + 1];
+      rgba[d + 2] = data[s + 2];
+      rgba[d + 3] = 255;
+    }
+  } else if (img.kind === pdfjsLib.ImageKind.GRAYSCALE_1BPP) {
+    const rowBytes = Math.ceil(width / 8);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const byteIdx = y * rowBytes + (x >> 3);
+        const bit = (data[byteIdx] >> (7 - (x & 7))) & 1;
+        const val = bit ? 255 : 0;
+        const dst = (y * width + x) * 4;
+        rgba[dst] = val;
+        rgba[dst + 1] = val;
+        rgba[dst + 2] = val;
+        rgba[dst + 3] = 255;
+      }
+    }
+  } else {
+    return null;
+  }
+
+  const imageData = new ImageData(rgba, width, height);
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
+
 /**
- * Extract embedded raster images from PDF pages
+ * Extract real embedded raster images from a PDF (without capturing full pages).
+ * Returns an empty array if the PDF contains only text/vectors and no embedded raster graphics.
  */
 export async function extractEmbeddedImages(
-  file: File,
-  onProgress?: (pct: number) => void
-): Promise<{ filename: string; blob: Blob }[]> {
-  const pdfDoc = await loadPdfJsDocument(file);
-  const total = pdfDoc.numPages;
-  const baseName = file.name.replace(/\.pdf$/i, '');
-  const extractedImages: { filename: string; blob: Blob }[] = [];
+  file: File | Uint8Array,
+  onProgress?: (pct: number) => void,
+  customName?: string
+): Promise<ExtractedImageItem[]> {
+  const arrayBuffer = file instanceof Uint8Array ? file : await file.arrayBuffer();
+  const baseName = (file instanceof Uint8Array ? (customName || 'document') : file.name).replace(/\.pdf$/i, '');
 
-  for (let i = 1; i <= total; i++) {
-    const page = await pdfDoc.getPage(i);
-    const operatorList = await page.getOperatorList();
+  // Step 1: Inspect XObject streams via pdf-lib (collect mask refs to exclude alpha masks)
+  const pdfLibDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+  const maskRefs = new Set<string>();
+  const imageXObjects: {
+    refKey: string;
+    stream: PDFRawStream;
+    isCleanJpeg: boolean;
+    width: number;
+    height: number;
+  }[] = [];
 
-    // Look for image operations and render them
-    // For reliable browser extraction, we render images or page crops
-    const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d')!;
-
-    // @ts-expect-error pdfjs typing
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    const blob = await new Promise<Blob>((res) =>
-      canvas.toBlob((b) => res(b!), 'image/png')
-    );
-
-    extractedImages.push({
-      filename: `${baseName}_image_page_${i}.png`,
-      blob,
-    });
-
-    if (onProgress) {
-      onProgress(Math.round((i / total) * 100));
+  for (const [, obj] of pdfLibDoc.context.enumerateIndirectObjects()) {
+    if (obj instanceof PDFRawStream) {
+      const subtype = obj.dict.get(PDFName.of('Subtype'));
+      if (subtype === PDFName.of('Image')) {
+        const smask = obj.dict.get(PDFName.of('SMask'));
+        const mask = obj.dict.get(PDFName.of('Mask'));
+        if (smask) maskRefs.add(smask.toString());
+        if (mask && !(mask instanceof PDFArray)) maskRefs.add(mask.toString());
+      }
     }
   }
 
+  for (const [ref, obj] of pdfLibDoc.context.enumerateIndirectObjects()) {
+    const refKey = ref.toString();
+    if (maskRefs.has(refKey)) continue;
+    if (obj instanceof PDFRawStream) {
+      const subtype = obj.dict.get(PDFName.of('Subtype'));
+      if (subtype !== PDFName.of('Image')) continue;
+
+      const filter = obj.dict.get(PDFName.of('Filter'));
+      const smask = obj.dict.get(PDFName.of('SMask'));
+      const mask = obj.dict.get(PDFName.of('Mask'));
+      const decode = obj.dict.get(PDFName.of('Decode'));
+      const colorSpace = obj.dict.get(PDFName.of('ColorSpace'));
+
+      const wObj = obj.dict.get(PDFName.of('Width'));
+      const hObj = obj.dict.get(PDFName.of('Height'));
+      const width = wObj instanceof PDFNumber ? wObj.asNumber() : 0;
+      const height = hObj instanceof PDFNumber ? hObj.asNumber() : 0;
+
+      const isDct =
+        filter === PDFName.of('DCTDecode') ||
+        (filter instanceof PDFArray && filter.size() === 1 && filter.get(0) === PDFName.of('DCTDecode'));
+      const isCmyk = colorSpace === PDFName.of('DeviceCMYK');
+      const isCleanJpeg = Boolean(isDct && !smask && !mask && !decode && !isCmyk);
+
+      imageXObjects.push({
+        refKey,
+        stream: obj,
+        isCleanJpeg,
+        width,
+        height,
+      });
+    }
+  }
+
+  const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+
+  // Node.js / test environment path
+  if (!isBrowser) {
+    if (onProgress) onProgress(100);
+    return imageXObjects.map((item, idx) => {
+      const mimeType = item.isCleanJpeg ? 'image/jpeg' : 'image/png';
+      const ext = item.isCleanJpeg ? 'jpg' : 'png';
+      return {
+        filename: `${baseName}_image_${idx + 1}.${ext}`,
+        blob: new Blob([item.stream.contents as unknown as BlobPart], { type: mimeType }),
+        mimeType,
+        width: item.width,
+        height: item.height,
+      };
+    });
+  }
+
+  // Browser path: fast lossless extraction if every image in the PDF is a clean JPEG (no inline images needed if none exist)
+  const pdfJsDoc = await loadPdfJsDocument(file);
+  const total = pdfJsDoc.numPages;
+
+  // Scan operator lists per page to detect both XObject and inline images
+  let hasInlineImages = false;
+  const pageImageOps: {
+    pageNumber: number;
+    page: pdfjsLib.PDFPageProxy;
+    xObjectNames: string[];
+    inlineImages: any[];
+  }[] = [];
+
+  for (let i = 1; i <= total; i++) {
+    const page = await pdfJsDoc.getPage(i);
+    const opList = await page.getOperatorList();
+    const xObjectNames: string[] = [];
+    const inlineImages: any[] = [];
+
+    for (let k = 0; k < opList.fnArray.length; k++) {
+      const fn = opList.fnArray[k];
+      const args = opList.argsArray[k];
+      if (
+        (fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintImageXObjectRepeat) &&
+        typeof args?.[0] === 'string'
+      ) {
+        if (!xObjectNames.includes(args[0])) {
+          xObjectNames.push(args[0]);
+        }
+      } else if (fn === pdfjsLib.OPS.paintInlineImageXObject && args?.[0]) {
+        hasInlineImages = true;
+        inlineImages.push(args[0]);
+      } else if (fn === pdfjsLib.OPS.paintInlineImageXObjectGroup && args?.[0]) {
+        hasInlineImages = true;
+        inlineImages.push(args[0]);
+      }
+    }
+
+    if (xObjectNames.length > 0 || inlineImages.length > 0) {
+      pageImageOps.push({ pageNumber: i, page, xObjectNames, inlineImages });
+    } else {
+      page.cleanup();
+    }
+
+    if (onProgress) {
+      onProgress(Math.round((i / total) * 40));
+    }
+  }
+
+  // Fast lossless JPEG extraction when all embedded images are clean DCTDecode JPEGs and no inline images exist
+  if (!hasInlineImages && imageXObjects.length > 0 && imageXObjects.every((x) => x.isCleanJpeg)) {
+    pageImageOps.forEach((p) => p.page.cleanup());
+    if (onProgress) onProgress(100);
+    return imageXObjects.map((item, idx) => ({
+      filename: `${baseName}_image_${idx + 1}.jpg`,
+      blob: new Blob([item.stream.contents as unknown as BlobPart], { type: 'image/jpeg' }),
+      mimeType: 'image/jpeg',
+      width: item.width,
+      height: item.height,
+    }));
+  }
+
+  // Decode all embedded XObject and inline images at native resolution via PDF.js
+  const extractedImages: ExtractedImageItem[] = [];
+  const seenCommonIds = new Set<string>();
+  let imageCounter = 0;
+
+  for (let idx = 0; idx < pageImageOps.length; idx++) {
+    const entry = pageImageOps[idx];
+    const { pageNumber, page, xObjectNames, inlineImages } = entry;
+
+    if (xObjectNames.length > 0) {
+      // Trigger decoding of page image objects onto a tiny offscreen canvas
+      const tinyViewport = page.getViewport({ scale: 0.1 });
+      const dummyCanvas = document.createElement('canvas');
+      dummyCanvas.width = Math.max(1, Math.round(tinyViewport.width));
+      dummyCanvas.height = Math.max(1, Math.round(tinyViewport.height));
+      const dummyCtx = dummyCanvas.getContext('2d');
+      if (dummyCtx) {
+        try {
+          // @ts-expect-error pdfjs typing
+          await page.render({ canvasContext: dummyCtx, viewport: tinyViewport }).promise;
+        } catch (err) {
+          console.warn(`Image decode render warning on page ${pageNumber}:`, err);
+        }
+      }
+
+      for (const objName of xObjectNames) {
+        try {
+          const isCommon = !page.objs.has(objName) && page.commonObjs.has(objName);
+          if (isCommon && seenCommonIds.has(objName)) continue;
+
+          const decoded = await new Promise<any>((resolve) => {
+            if (page.objs.has(objName)) {
+              page.objs.get(objName, (data: any) => resolve(data));
+            } else if (page.commonObjs.has(objName)) {
+              seenCommonIds.add(objName);
+              page.commonObjs.get(objName, (data: any) => resolve(data));
+            } else {
+              resolve(null);
+            }
+          });
+
+          const imgCanvas = pdfDecodedImageToCanvas(decoded);
+          if (imgCanvas) {
+            const blob = await new Promise<Blob | null>((res) =>
+              imgCanvas.toBlob((b) => res(b), 'image/png')
+            );
+            if (blob) {
+              imageCounter++;
+              extractedImages.push({
+                filename: `${baseName}_p${pageNumber}_img${imageCounter}.png`,
+                blob,
+                mimeType: 'image/png',
+                width: imgCanvas.width,
+                height: imgCanvas.height,
+                pageNumber,
+              });
+            }
+          }
+        } catch (err) {
+          console.warn(`Skipping unreadable image ${objName} on page ${pageNumber}:`, err);
+        }
+      }
+    }
+
+    for (const inlineImg of inlineImages) {
+      try {
+        const imgCanvas = pdfDecodedImageToCanvas(inlineImg);
+        if (imgCanvas) {
+          const blob = await new Promise<Blob | null>((res) =>
+            imgCanvas.toBlob((b) => res(b), 'image/png')
+          );
+          if (blob) {
+            imageCounter++;
+            extractedImages.push({
+              filename: `${baseName}_p${pageNumber}_inline${imageCounter}.png`,
+              blob,
+              mimeType: 'image/png',
+              width: imgCanvas.width,
+              height: imgCanvas.height,
+              pageNumber,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`Skipping inline image on page ${pageNumber}:`, err);
+      }
+    }
+
+    page.cleanup();
+
+    if (onProgress) {
+      onProgress(40 + Math.round(((idx + 1) / pageImageOps.length) * 60));
+    }
+  }
+
+  // Fallback: if PDF.js produced 0 images (e.g. Form XObject nested images) but pdf-lib found clean JPEGs
+  if (extractedImages.length === 0 && imageXObjects.length > 0) {
+    for (let i = 0; i < imageXObjects.length; i++) {
+      const item = imageXObjects[i];
+      if (item.isCleanJpeg) {
+        extractedImages.push({
+          filename: `${baseName}_image_${i + 1}.jpg`,
+          blob: new Blob([item.stream.contents as unknown as BlobPart], { type: 'image/jpeg' }),
+          mimeType: 'image/jpeg',
+          width: item.width,
+          height: item.height,
+        });
+      }
+    }
+  }
+
+  if (onProgress) onProgress(100);
   return extractedImages;
 }
 
