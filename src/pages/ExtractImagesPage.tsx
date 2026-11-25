@@ -4,14 +4,20 @@ import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { extractEmbeddedImages, downloadFile, ExtractedImageItem } from '../services/pdfService';
-import JSZip from 'jszip';
+import { isCancelledError } from '../utils/fileUtils';
 import { Image as ImageIcon, Download, Archive } from 'lucide-react';
 
 type ExtractedImageWithUrl = ExtractedImageItem & { url: string };
 
 export const ExtractImagesPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -19,6 +25,7 @@ export const ExtractImagesPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const urlsRef = useRef<string[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const clearImages = () => {
     urlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -33,9 +40,11 @@ export const ExtractImagesPage: React.FC = () => {
     };
   }, []);
 
-  const handleFileSelected = (files: File[]) => {
+  const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    setFile(files[0]);
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    setFile(ready[0]);
     clearImages();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -44,6 +53,9 @@ export const ExtractImagesPage: React.FC = () => {
   const handleExtract = async () => {
     if (!file) return;
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsProcessing(true);
     setProgress(5);
     setErrorMessage(null);
@@ -51,7 +63,12 @@ export const ExtractImagesPage: React.FC = () => {
     clearImages();
 
     try {
-      const extracted = await extractEmbeddedImages(file, (pct) => setProgress(pct));
+      const extracted = await extractEmbeddedImages(
+        file,
+        (pct) => setProgress(pct),
+        undefined,
+        controller.signal
+      );
       if (extracted.length === 0) {
         setErrorMessage(t.extractImages.noImagesFound);
       } else {
@@ -69,9 +86,14 @@ export const ExtractImagesPage: React.FC = () => {
         );
       }
     } catch (err: any) {
-      console.error('Extract error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Extract error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -80,6 +102,7 @@ export const ExtractImagesPage: React.FC = () => {
     if (images.length === 0) return;
     setIsProcessing(true);
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       images.forEach((img) => {
         zip.file(img.filename, img.blob);
@@ -99,6 +122,8 @@ export const ExtractImagesPage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="extractImages" />
+      <PasswordModal {...gate.passwordModalProps} />
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -109,6 +134,8 @@ export const ExtractImagesPage: React.FC = () => {
           {t.extractImages.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -143,6 +170,7 @@ export const ExtractImagesPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               clearImages();
+              gate.clearNotices();
             }}
           />
 
@@ -161,7 +189,16 @@ export const ExtractImagesPage: React.FC = () => {
 
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={t.extractImages.progress} />
+              <ProgressBar
+                progress={progress}
+                statusText={t.extractImages.progress}
+                onCancel={
+                  abortControllerRef.current
+                    ? () => abortControllerRef.current?.abort()
+                    : undefined
+                }
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -217,6 +254,7 @@ export const ExtractImagesPage: React.FC = () => {
           )}
         </div>
       )}
+      <ToolSeoSection pageKey="extractImages" toolName={t.nav.extractImages} />
     </div>
   );
 };

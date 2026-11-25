@@ -23,7 +23,11 @@ import {
   Archive,
   AlignJustify,
   ArrowRight,
+  Lock,
+  Unlock,
+  FileType,
 } from 'lucide-react';
+import { APP_TOTAL_TOOLS } from '../config/brand';
 
 interface ToolItem {
   id: string;
@@ -210,6 +214,16 @@ export const CommandPalette: React.FC = () => {
       keywords: ['extract images', 'download photos', 'استخراج الصور'],
     },
     {
+      id: 'pdf-to-word',
+      name: t.nav.pdfToWord,
+      desc: t.pdfToWord.subtitle,
+      path: '/pdf-to-word',
+      category: 'convert',
+      icon: FileType,
+      badge: 'DOCX · RTL',
+      keywords: ['pdf to word', 'docx', 'word', 'convert word', 'وورد', 'تحويل الى word', 'مستند word'],
+    },
+    {
       id: 'ocr',
       name: t.nav.ocr,
       desc: t.ocr.subtitle,
@@ -218,6 +232,26 @@ export const CommandPalette: React.FC = () => {
       icon: ScanText,
       badge: 'Offline AI',
       keywords: ['ocr', 'text recognition', 'tesseract', 'تعرف نصوص', 'استخراج نص'],
+    },
+    {
+      id: 'protect',
+      name: t.nav.protect,
+      desc: t.protect.subtitle,
+      path: '/protect',
+      category: 'security',
+      icon: Lock,
+      badge: 'AES-256',
+      keywords: ['protect', 'password', 'encrypt', 'lock pdf', 'حماية', 'تشفير', 'كلمة مرور'],
+    },
+    {
+      id: 'unlock',
+      name: t.nav.unlock,
+      desc: t.unlock.subtitle,
+      path: '/unlock',
+      category: 'security',
+      icon: Unlock,
+      badge: 'Decrypt',
+      keywords: ['unlock', 'decrypt', 'remove password', 'فك تشفير', 'ازالة كلمة مرور', 'فتح pdf'],
     },
     {
       id: 'security',
@@ -411,8 +445,8 @@ export const CommandPalette: React.FC = () => {
             <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
             <span>
               {language === 'ar'
-                ? '19 أداة مجانية 100% تعمل محلياً داخل متصفحك دون رفع ملفات'
-                : '19 free, client-side tools processed 100% in your browser'}
+                ? `${APP_TOTAL_TOOLS} أداة مجانية 100% تعمل محلياً داخل متصفحك دون رفع ملفات`
+                : `${APP_TOTAL_TOOLS} free, client-side tools processed 100% in your browser`}
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-2">

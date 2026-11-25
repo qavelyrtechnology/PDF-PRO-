@@ -3,15 +3,21 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   loadPdfJsDocument,
   addHeaderAndFooterToPdf,
   shareOrDownloadFile,
 } from '../services/pdfService';
-import { AlignJustify, Download, Share2, Info } from 'lucide-react';
+import { AlignJustify, Info } from 'lucide-react';
 
 export const HeaderFooterPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState(0);
 
@@ -31,18 +37,23 @@ export const HeaderFooterPage: React.FC = () => {
 
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
     setHeaderFooterBytes(null);
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    let doc: Awaited<ReturnType<typeof loadPdfJsDocument>> | null = null;
     try {
-      const doc = await loadPdfJsDocument(selected);
+      doc = await loadPdfJsDocument(selected);
       setTotalPages(doc.numPages);
-    } catch (e) {
+    } catch {
       setErrorMessage(t.reader.pageRenderError);
       setFile(null);
+    } finally {
+      await doc?.loadingTask?.destroy().catch(() => {});
     }
   };
 
@@ -77,6 +88,9 @@ export const HeaderFooterPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="headerFooter" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -87,6 +101,8 @@ export const HeaderFooterPage: React.FC = () => {
           {t.headerFooter.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-start gap-2.5 text-xs text-blue-900 dark:text-blue-200">
         <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -129,6 +145,7 @@ export const HeaderFooterPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               setHeaderFooterBytes(null);
+              gate.clearNotices();
             }}
           />
 
@@ -238,6 +255,7 @@ export const HeaderFooterPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="headerFooter" toolName={t.nav.headerFooter} />
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { PageSeo } from '../components/PageSeo';
 import { Shield, Lock, EyeOff, Cpu, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export const PrivacyPage: React.FC = () => {
@@ -35,6 +36,7 @@ export const PrivacyPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      <PageSeo pageKey="privacy" />
       {/* Header */}
       <div className="text-center space-y-4 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 text-xs font-semibold text-emerald-700 dark:text-emerald-300">

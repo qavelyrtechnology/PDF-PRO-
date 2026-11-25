@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { BrandMark } from '../components/BrandMark';
+import { PageSeo } from '../components/PageSeo';
+import { SITE_URL, QAVELYR_URL, APP_TOTAL_TOOLS } from '../config/brand';
+import { validateFileSize } from '../utils/fileUtils';
 import {
   FileText,
   Layers,
@@ -14,6 +17,8 @@ import {
   ScanText,
   ShieldCheck,
   Lock,
+  Unlock,
+  FileType,
   Zap,
   CheckCircle2,
   ArrowRight,
@@ -34,13 +39,27 @@ export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<'all' | 'organize' | 'edit' | 'convert' | 'security'>('all');
 
+  const [dropError, setDropError] = useState<string | null>(null);
+
   const openCommandPalette = () => {
     window.dispatchEvent(new CustomEvent('open-command-palette'));
   };
 
-  // If user drops a PDF directly on the home hero, guide them
+  // If user drops a PDF directly on the home hero, validate size and guide them
   const handleQuickDrop = (files: File[]) => {
     if (files.length === 0) return;
+    setDropError(null);
+    for (const f of files) {
+      const check = validateFileSize(f);
+      if (check.status === 'blocked') {
+        setDropError(
+          t.fileLimits.blockTooLarge
+            .replace('{name}', f.name)
+            .replace('{size}', check.formattedSize)
+        );
+        return;
+      }
+    }
     if (files.length === 1) {
       const file = files[0];
       try {
@@ -53,6 +72,33 @@ export const HomePage: React.FC = () => {
     } else {
       navigate('/merge');
     }
+  };
+
+  const homeJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Free PDF Studio',
+    url: SITE_URL,
+    applicationCategory: 'UtilitiesApplication',
+    operatingSystem: 'Any',
+    inLanguage: ['en', 'ar'],
+    isAccessibleForFree: true,
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD',
+    },
+    description: t.seo.pages.home.description,
+    creator: {
+      '@type': 'Organization',
+      name: 'Qavelyr',
+      url: QAVELYR_URL,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Qavelyr',
+      url: QAVELYR_URL,
+    },
   };
 
   const toolCards = [
@@ -210,6 +256,15 @@ export const HomePage: React.FC = () => {
       badge: language === 'ar' ? 'استخراج صور' : 'Asset Extract',
     },
     {
+      title: t.nav.pdfToWord,
+      desc: t.pdfToWord.subtitle,
+      path: '/pdf-to-word',
+      category: 'convert',
+      icon: FileType,
+      color: 'from-blue-600 to-indigo-700',
+      badge: language === 'ar' ? 'DOCX · عربي RTL' : 'PDF to Word',
+    },
+    {
       title: t.nav.ocr,
       desc: t.ocr.subtitle,
       path: '/ocr',
@@ -217,6 +272,24 @@ export const HomePage: React.FC = () => {
       icon: ScanText,
       color: 'from-red-500 to-rose-600',
       badge: language === 'ar' ? 'تعرف نصوص' : 'Arabic + English OCR',
+    },
+    {
+      title: t.nav.protect,
+      desc: t.protect.subtitle,
+      path: '/protect',
+      category: 'security',
+      icon: Lock,
+      color: 'from-rose-600 to-pink-700',
+      badge: 'AES-256',
+    },
+    {
+      title: t.nav.unlock,
+      desc: t.unlock.subtitle,
+      path: '/unlock',
+      category: 'security',
+      icon: Unlock,
+      color: 'from-emerald-600 to-teal-700',
+      badge: language === 'ar' ? 'فك التشفير' : 'Decrypt',
     },
     {
       title: t.nav.security,
@@ -230,7 +303,7 @@ export const HomePage: React.FC = () => {
   ];
 
   const categories = [
-    { id: 'all', name: language === 'ar' ? 'الكل (19 أداة)' : 'All (19 Tools)' },
+    { id: 'all', name: language === 'ar' ? `الكل (${APP_TOTAL_TOOLS} أداة)` : `All (${APP_TOTAL_TOOLS} Tools)` },
     { id: 'organize', name: language === 'ar' ? 'تنظيم وعرض' : 'Organize & View' },
     { id: 'edit', name: language === 'ar' ? 'تعديل وتوقيع' : 'Edit & Sign' },
     { id: 'convert', name: language === 'ar' ? 'تحويل واستخراج' : 'Convert & Extract' },
@@ -247,6 +320,7 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-16 pb-12">
+      <PageSeo pageKey="home" jsonLd={homeJsonLd} />
       {/* Architectural Studio Split Hero */}
       <section className="studio-grid-surface border-b border-slate-200/80 dark:border-slate-800/80 py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
@@ -325,6 +399,11 @@ export const HomePage: React.FC = () => {
                 allowedFormatsText="PDF"
                 multiple={true}
               />
+              {dropError && (
+                <p className="mt-2 px-2 text-xs text-rose-600 dark:text-rose-400">
+                  {dropError}
+                </p>
+              )}
             </div>
           </div>
         </div>

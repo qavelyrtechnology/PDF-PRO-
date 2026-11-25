@@ -1,7 +1,9 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { BrandMark } from '../components/BrandMark';
-import { HelpCircle, Cpu, ShieldCheck } from 'lucide-react';
+import { PageSeo } from '../components/PageSeo';
+import { QAVELYR_LOGO_PATH, QAVELYR_URL } from '../config/brand';
+import { HelpCircle, Cpu, ShieldCheck, ExternalLink, Building2 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
   const { t } = useLanguage();
@@ -21,23 +23,25 @@ export const AboutPage: React.FC = () => {
     },
     {
       name: 'PDF.js (Mozilla)',
-      role: 'Document parsing, canvas page rendering, rasterization',
+      role: 'Document parsing, canvas page rendering, text layout and rasterization',
       badge: 'WebAssembly / Worker',
     },
     {
       name: 'Tesseract.js',
-      role: 'Client-side Optical Character Recognition (OCR) for English and Arabic',
+      role: 'On-demand client-side OCR for English and Arabic',
       badge: 'WASM OCR',
     },
     {
-      name: 'JSZip',
-      role: 'In-memory multi-file zip archiving for split pages and image bundles',
-      badge: 'Local Archiving',
+      name: 'docx & @pdfsmaller',
+      role: 'In-browser Word (.docx) generation and AES-256 / RC4 encryption',
+      badge: 'WebCrypto / Local',
     },
   ];
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+      <PageSeo pageKey="about" />
+
       {/* Header */}
       <div className="text-center space-y-4 max-w-2xl mx-auto">
         <div className="flex justify-center">
@@ -60,6 +64,35 @@ export const AboutPage: React.FC = () => {
         <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
           {t.about.missionText}
         </p>
+      </div>
+
+      {/* About Qavelyr */}
+      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <img
+          src={QAVELYR_LOGO_PATH}
+          alt="Qavelyr"
+          width={56}
+          height={56}
+          className="w-14 h-14 rounded-xl object-contain border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1 shrink-0"
+        />
+        <div className="space-y-2 flex-1">
+          <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-lg">
+            <Building2 className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+            <h2>{t.about.aboutQavelyrTitle}</h2>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            {t.about.aboutQavelyrText}
+          </p>
+          <a
+            href={QAVELYR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline pt-1"
+          >
+            <span>{t.about.visitQavelyr}</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
       </div>
 
       {/* Open Tech Stack */}

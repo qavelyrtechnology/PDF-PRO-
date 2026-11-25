@@ -2,7 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { BrandMark } from './BrandMark';
-import { Shield, Cpu, CheckCircle } from 'lucide-react';
+import { QAVELYR_URL, QAVELYR_LOGO_PATH, APP_TOTAL_TOOLS } from '../config/brand';
+import { Shield, Cpu, CheckCircle, ExternalLink } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
@@ -157,6 +158,11 @@ export const Footer: React.FC = () => {
             </h3>
             <ul className="space-y-2 text-xs">
               <li>
+                <Link to="/pdf-to-word" className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                  {t.nav.pdfToWord}
+                </Link>
+              </li>
+              <li>
                 <Link to="/images-to-pdf" className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
                   {t.nav.imagesToPdf}
                 </Link>
@@ -177,13 +183,25 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/protect" className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                  {t.nav.protect}
+                </Link>
+              </li>
+              <li>
+                <Link to="/unlock" className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                  {t.nav.unlock}
+                </Link>
+              </li>
+              <li>
                 <Link to="/security" className="text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
                   {t.nav.security}
                 </Link>
               </li>
               <li className="pt-2">
                 <Link to="/tools" className="font-semibold text-rose-600 dark:text-rose-400 hover:underline">
-                  {language === 'ar' ? 'جميع الـ 19 أداة ←' : 'View all 19 tools →'}
+                  {language === 'ar'
+                    ? `جميع الـ ${APP_TOTAL_TOOLS} أداة ←`
+                    : `View all ${APP_TOTAL_TOOLS} tools →`}
                 </Link>
               </li>
             </ul>
@@ -219,11 +237,26 @@ export const Footer: React.FC = () => {
 
         <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
           <p>{t.footer.allRightsReserved}</p>
-          <p className="flex items-center gap-2">
-            <span>{language === 'ar' ? 'معالجة محلية داخل المتصفح' : 'Local-First Document Suite'}</span>
-            <span aria-hidden="true">·</span>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <a
+              href={QAVELYR_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 font-medium transition-colors"
+            >
+              <img
+                src={QAVELYR_LOGO_PATH}
+                alt="Qavelyr"
+                width={16}
+                height={16}
+                className="w-4 h-4 rounded-xs object-contain shrink-0"
+              />
+              <span>{t.footer.productOfQavelyr}</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
+            </a>
+            <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span>{language === 'ar' ? 'العربية / English' : 'EN / AR'}</span>
-          </p>
+          </div>
         </div>
       </div>
     </footer>

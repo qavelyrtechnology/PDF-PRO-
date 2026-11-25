@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { BrandMark } from '../components/BrandMark';
+import { PageSeo } from '../components/PageSeo';
+import { APP_TOTAL_TOOLS } from '../config/brand';
 import {
   FileText,
   Layers,
@@ -23,6 +25,9 @@ import {
   Columns2,
   Archive,
   AlignJustify,
+  Lock,
+  Unlock,
+  FileType,
 } from 'lucide-react';
 
 export const ToolsDirectory: React.FC = () => {
@@ -185,6 +190,15 @@ export const ToolsDirectory: React.FC = () => {
       badge: language === 'ar' ? 'استخراج كلي' : 'All Assets',
     },
     {
+      id: 'pdf-to-word',
+      title: t.nav.pdfToWord,
+      desc: t.pdfToWord.subtitle,
+      path: '/pdf-to-word',
+      category: 'convert',
+      icon: FileType,
+      badge: language === 'ar' ? 'ملف Word' : 'DOCX · RTL',
+    },
+    {
       id: 'ocr',
       title: t.nav.ocr,
       desc: t.ocr.subtitle,
@@ -192,6 +206,24 @@ export const ToolsDirectory: React.FC = () => {
       category: 'convert',
       icon: ScanText,
       badge: language === 'ar' ? 'عربي وإنجليزي' : 'Arabic & English',
+    },
+    {
+      id: 'protect',
+      title: t.nav.protect,
+      desc: t.protect.subtitle,
+      path: '/protect',
+      category: 'security',
+      icon: Lock,
+      badge: 'AES-256',
+    },
+    {
+      id: 'unlock',
+      title: t.nav.unlock,
+      desc: t.unlock.subtitle,
+      path: '/unlock',
+      category: 'security',
+      icon: Unlock,
+      badge: language === 'ar' ? 'إزالة كلمة مرور' : 'Decrypt PDF',
     },
     {
       id: 'security',
@@ -245,12 +277,15 @@ export const ToolsDirectory: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <PageSeo pageKey="tools" />
       {/* Page Header */}
       <div className="text-center space-y-3 max-w-2xl mx-auto">
         <div className="inline-flex items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-400">
           <BrandMark size="sm" />
           <span className="tabular-nums">
-            {language === 'ar' ? '19 أداة PDF مجانية تعمل محلياً' : '19 Local-First PDF Tools'}
+            {language === 'ar'
+              ? `${APP_TOTAL_TOOLS} أداة PDF مجانية تعمل محلياً`
+              : `${APP_TOTAL_TOOLS} Local-First PDF Tools`}
           </span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">

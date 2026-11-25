@@ -1,20 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   renderAllPagesToImages,
   loadPdfJsDocument,
   downloadFile,
 } from '../services/pdfService';
-import JSZip from 'jszip';
-import { RefreshCw, Image as ImageIcon, Download, Archive, Info, ShieldAlert } from 'lucide-react';
+import { isCancelledError } from '../utils/fileUtils';
+import { RefreshCw, Download, Archive, ShieldAlert } from 'lucide-react';
+
+interface ExportedImageWithUrl {
+  pageNumber: number;
+  blob: Blob;
+  filename: string;
+  previewUrl: string;
+}
 
 export const ConvertPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState(0);
   const [format, setFormat] = useState<'image/png' | 'image/jpeg'>('image/png');
@@ -22,49 +35,87 @@ export const ConvertPage: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
-  const [exportedImages, setExportedImages] = useState<
-    { pageNumber: number; blob: Blob; filename: string }[]
-  >([]);
+  const [exportedImages, setExportedImages] = useState<ExportedImageWithUrl[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const previewUrlsRef = useRef<string[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const clearExportedImages = () => {
+    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrlsRef.current = [];
+    setExportedImages([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current = [];
+    };
+  }, []);
 
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
-    setExportedImages([]);
+    clearExportedImages();
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    let doc: Awaited<ReturnType<typeof loadPdfJsDocument>> | null = null;
     try {
-      const doc = await loadPdfJsDocument(selected);
+      doc = await loadPdfJsDocument(selected);
       setTotalPages(doc.numPages);
     } catch (err: any) {
       console.error('Convert load error:', err);
       setErrorMessage(t.reader.pageRenderError);
       setFile(null);
+    } finally {
+      await doc?.loadingTask?.destroy().catch(() => {});
     }
   };
 
   const handleConvert = async () => {
     if (!file) return;
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsProcessing(true);
     setProgress(5);
     setStatusText(t.convert.convertingProgress);
     setErrorMessage(null);
     setSuccessMessage(null);
+    clearExportedImages();
 
     try {
-      const results = await renderAllPagesToImages(file, format, scale, (pct) => {
-        setProgress(pct);
+      const results = await renderAllPagesToImages(
+        file,
+        format,
+        scale,
+        (pct) => {
+          setProgress(pct);
+        },
+        controller.signal
+      );
+      const withUrls = results.map((item) => {
+        const previewUrl = URL.createObjectURL(item.blob);
+        previewUrlsRef.current.push(previewUrl);
+        return { ...item, previewUrl };
       });
-      setExportedImages(results);
+      setExportedImages(withUrls);
       setSuccessMessage(`Successfully rendered ${results.length} page(s) to images!`);
     } catch (err: any) {
-      console.error('Conversion error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Conversion error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -80,6 +131,7 @@ export const ConvertPage: React.FC = () => {
     setStatusText('Compressing images into ZIP file...');
 
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       exportedImages.forEach((img) => {
         zip.file(img.filename, img.blob);
@@ -101,6 +153,8 @@ export const ConvertPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="convert" />
+      <PasswordModal {...gate.passwordModalProps} />
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -139,6 +193,8 @@ export const ConvertPage: React.FC = () => {
         </div>
       </div>
 
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
+
       {errorMessage && (
         <StatusBanner
           type="error"
@@ -174,7 +230,8 @@ export const ConvertPage: React.FC = () => {
             pageCount={totalPages}
             onRemove={() => {
               setFile(null);
-              setExportedImages([]);
+              clearExportedImages();
+              gate.clearNotices();
             }}
           />
 
@@ -270,7 +327,16 @@ export const ConvertPage: React.FC = () => {
           {/* Progress Indicator */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={statusText} />
+              <ProgressBar
+                progress={progress}
+                statusText={statusText}
+                onCancel={
+                  abortControllerRef.current
+                    ? () => abortControllerRef.current?.abort()
+                    : undefined
+                }
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -295,16 +361,14 @@ export const ConvertPage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {exportedImages.map((img) => {
-                  const previewUrl = URL.createObjectURL(img.blob);
-                  return (
+                {exportedImages.map((img) => (
                     <div
                       key={img.pageNumber}
                       className="group p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2"
                     >
                       <div className="aspect-[3/4] bg-slate-100 dark:bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800">
                         <img
-                          src={previewUrl}
+                          src={img.previewUrl}
                           alt={img.filename}
                           className="w-full h-full object-contain"
                         />
@@ -323,13 +387,13 @@ export const ConvertPage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                  );
-                })}
+                ))}
               </div>
             </div>
           )}
         </div>
       )}
+      <ToolSeoSection pageKey="convert" toolName={t.nav.convert} />
     </div>
   );
 };

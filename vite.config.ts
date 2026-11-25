@@ -11,7 +11,14 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+        includeAssets: [
+          'icon.svg',
+          'apple-touch-icon.png',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'qavelyr-logo.png',
+          'robots.txt',
+        ],
         manifest: {
           id: '/',
           name: 'Free PDF Studio',
@@ -45,16 +52,17 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,mjs,wasm}'],
-          maximumFileSizeToCacheInBytes: 30 * 1024 * 1024, // 30MB for WASM/worker
+          globIgnores: ['**/tesseract/**', '**/assets/aistudio/**'],
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // Keep precache lightweight (<5 MB total)
           navigateFallback: '/index.html',
           runtimeCaching: [
             {
-              urlPattern: /\/tesseract\/lang\/.*\.traineddata(\.gz)?$/,
+              urlPattern: /\/tesseract\/.*/,
               handler: 'CacheFirst',
               options: {
                 cacheName: 'tesseract-traineddata',
                 expiration: {
-                  maxEntries: 10,
+                  maxEntries: 20,
                   maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
                 },
               },
@@ -89,6 +97,9 @@ export default defineConfig(() => {
             if (id.includes('pdfjs-dist')) return 'pdfjs';
             if (id.includes('tesseract.js')) return 'tesseract';
             if (id.includes('pdf-lib')) return 'pdflib';
+            if (id.includes('jszip')) return 'jszip';
+            if (id.includes('docx')) return 'docx';
+            if (id.includes('@pdfsmaller')) return 'pdf-crypto';
           },
         },
       },

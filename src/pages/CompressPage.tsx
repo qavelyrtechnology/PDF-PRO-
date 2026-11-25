@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   compressPdfInBrowser,
   formatBytes,
@@ -12,6 +17,7 @@ import {
   CompressionMode,
   CompressionResult,
 } from '../services/pdfService';
+import { isCancelledError } from '../utils/fileUtils';
 import {
   Minimize2,
   Download,
@@ -26,6 +32,7 @@ import {
 
 export const CompressPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState<number>(0);
 
@@ -37,26 +44,35 @@ export const CompressPage: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<CompressionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
     setResult(null);
     setErrorMessage(null);
 
+    let doc: Awaited<ReturnType<typeof loadPdfJsDocument>> | null = null;
     try {
-      const doc = await loadPdfJsDocument(selected);
+      doc = await loadPdfJsDocument(selected);
       setTotalPages(doc.numPages);
     } catch (err: any) {
       console.error('Compress page load error:', err);
       setErrorMessage(t.reader.pageRenderError);
       setFile(null);
+    } finally {
+      await doc?.loadingTask?.destroy().catch(() => {});
     }
   };
 
   const handleCompress = async () => {
     if (!file) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsProcessing(true);
     setProgress(10);
@@ -70,13 +86,19 @@ export const CompressPage: React.FC = () => {
         rasterLevel,
         (pct) => {
           setProgress(pct);
-        }
+        },
+        controller.signal
       );
       setResult(compressionResult);
     } catch (err: any) {
-      console.error('Compression execution error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Compression execution error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -92,6 +114,9 @@ export const CompressPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="compress" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -102,6 +127,8 @@ export const CompressPage: React.FC = () => {
           {t.compress.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {/* Honest In-Browser Disclaimer Box */}
       <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3 text-xs text-amber-900 dark:text-amber-200">
@@ -140,6 +167,7 @@ export const CompressPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               setResult(null);
+              gate.clearNotices();
             }}
           />
 
@@ -305,7 +333,12 @@ export const CompressPage: React.FC = () => {
           {/* Progress */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={t.compress.compressingProgress} />
+              <ProgressBar
+                progress={progress}
+                statusText={t.compress.compressingProgress}
+                onCancel={() => abortControllerRef.current?.abort()}
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -417,6 +450,7 @@ export const CompressPage: React.FC = () => {
           )}
         </div>
       )}
+      <ToolSeoSection pageKey="compress" toolName={t.nav.compress} />
     </div>
   );
 };

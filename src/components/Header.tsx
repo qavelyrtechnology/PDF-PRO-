@@ -31,7 +31,10 @@ import {
   Columns2,
   Archive,
   AlignJustify,
+  Unlock,
+  FileType,
 } from 'lucide-react';
+import { APP_TOTAL_TOOLS } from '../config/brand';
 
 export const Header: React.FC = () => {
   const { t, language, setLanguage, isRtl } = useLanguage();
@@ -88,12 +91,15 @@ export const Header: React.FC = () => {
       ],
     },
     {
-      name: language === 'ar' ? 'تحويل واستخراج' : 'Convert & Extract',
+      name: language === 'ar' ? 'تحويل وأمان' : 'Convert & Security',
       items: [
+        { path: '/pdf-to-word', label: t.nav.pdfToWord, icon: FileType, desc: t.pdfToWord.subtitle },
         { path: '/images-to-pdf', label: t.nav.imagesToPdf, icon: ImageIcon, desc: t.imagesToPdf.subtitle },
         { path: '/convert', label: t.nav.convert, icon: RefreshCw, desc: t.convert.subtitle },
         { path: '/extract-images', label: t.nav.extractImages, icon: Archive, desc: t.extractImages.subtitle },
         { path: '/ocr', label: t.nav.ocr, icon: ScanText, desc: t.ocr.subtitle },
+        { path: '/protect', label: t.nav.protect, icon: Lock, desc: t.protect.subtitle },
+        { path: '/unlock', label: t.nav.unlock, icon: Unlock, desc: t.unlock.subtitle },
         { path: '/security', label: t.nav.security, icon: ShieldCheck, desc: t.security.subtitle },
       ],
     },
@@ -126,9 +132,14 @@ export const Header: React.FC = () => {
             onClick={() => setMobileMenuOpen(false)}
           >
             <BrandMark size="md" className="group-hover:scale-105 transition-transform duration-150" />
-            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
-              {t.appName}
-            </span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0">
+                {t.appName}
+              </span>
+              <span className="hidden sm:inline text-[11px] font-medium text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                {t.header.byQavelyr}
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Nav Links */}
@@ -215,7 +226,11 @@ export const Header: React.FC = () => {
                       className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1"
                     >
                       <LayoutGrid className="w-3.5 h-3.5" />
-                      <span>{language === 'ar' ? 'عرض دليل الأدوات الشامل (19 أداة)' : 'View All 19 Tools Directory'}</span>
+                      <span>
+                        {language === 'ar'
+                          ? `عرض دليل الأدوات الشامل (${APP_TOTAL_TOOLS} أداة)`
+                          : `View All ${APP_TOTAL_TOOLS} Tools Directory`}
+                      </span>
                     </Link>
                     <span className="text-[11px] text-slate-400 tabular-nums">
                       {language === 'ar' ? '100% مجاني ومحلي' : '100% Free · Local'}
@@ -319,7 +334,7 @@ export const Header: React.FC = () => {
           >
             <span className="flex items-center gap-2">
               <Search className="w-4 h-4 text-rose-500" />
-              {language === 'ar' ? 'بحث سريع في جميع الأدوات' : 'Search all 19 tools'}
+              {language === 'ar' ? `بحث سريع في جميع الأدوات (${APP_TOTAL_TOOLS})` : `Search all ${APP_TOTAL_TOOLS} tools`}
             </span>
             <kbd className="text-xs px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600">
               Ctrl+K

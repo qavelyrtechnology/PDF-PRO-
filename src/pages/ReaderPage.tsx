@@ -2,11 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   loadPdfJsDocument,
   renderPdfPageToCanvas,
   shareOrDownloadFile,
 } from '../services/pdfService';
+import { isPdfPasswordError } from '../utils/fileUtils';
 import type * as pdfjsLib from 'pdfjs-dist';
 import {
   ChevronLeft,
@@ -27,6 +33,7 @@ import {
 
 export const ReaderPage: React.FC = () => {
   const { t, isRtl } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,36 +44,75 @@ export const ReaderPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([]);
+  const [pendingEncryptedFile, setPendingEncryptedFile] = useState<File | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [unlockingPassword, setUnlockingPassword] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const handleFilesSelected = async (files: File[]) => {
-    if (files.length === 0) return;
-    const selectedFile = files[0];
-    setFile(selectedFile);
+  // Destroy PDF.js document proxy cleanly when replaced or unmounted
+  useEffect(() => {
+    return () => {
+      pdfDoc?.loadingTask?.destroy().catch(() => {});
+    };
+  }, [pdfDoc]);
+
+  const openDocument = async (selectedFile: File, password?: string) => {
     setLoading(true);
     setErrorMessage(null);
     setThumbnailUrls([]);
 
     try {
-      const doc = await loadPdfJsDocument(selectedFile);
+      const doc = await loadPdfJsDocument(selectedFile, password);
+      setFile(selectedFile);
       setPdfDoc(doc);
       setTotalPages(doc.numPages);
       setCurrentPage(1);
       setRotation(0);
+      setPendingEncryptedFile(null);
+      setPasswordError(null);
 
       // Pre-render thumbnails for quick navigation
       generateThumbnails(doc);
+      return true;
     } catch (err: any) {
-      console.error('PDF load error:', err);
-      if (err?.name === 'PasswordException') {
-        setErrorMessage(t.reader.passwordRequired);
-      } else {
-        setErrorMessage(t.reader.pageRenderError);
+      if (isPdfPasswordError(err)) {
+        setPendingEncryptedFile(selectedFile);
+        setPasswordError(
+          err?.name === 'InvalidPdfPasswordError' ? t.passwordDialog.wrongPassword : null
+        );
+        return false;
       }
+      console.error('PDF load error:', err);
+      setErrorMessage(t.reader.pageRenderError);
       setPdfDoc(null);
+      return false;
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFilesSelected = async (files: File[]) => {
+    if (files.length === 0) return;
+    const allowed = gate.checkFileSizes([files[0]]);
+    if (allowed.length === 0) return;
+    await openDocument(allowed[0]);
+  };
+
+  const handlePasswordSubmit = async (password: string) => {
+    if (!pendingEncryptedFile) return;
+    setUnlockingPassword(true);
+    setPasswordError(null);
+    try {
+      await openDocument(pendingEncryptedFile, password);
+    } finally {
+      setUnlockingPassword(false);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setPendingEncryptedFile(null);
+    setPasswordError(null);
+    setUnlockingPassword(false);
   };
 
   const generateThumbnails = async (doc: pdfjsLib.PDFDocumentProxy) => {
@@ -173,10 +219,21 @@ export const ReaderPage: React.FC = () => {
     setCurrentPage(1);
     setTotalPages(0);
     setErrorMessage(null);
+    gate.clearNotices();
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="reader" />
+      <PasswordModal
+        isOpen={Boolean(pendingEncryptedFile)}
+        filename={pendingEncryptedFile?.name || ''}
+        errorMessage={passwordError}
+        isSubmitting={unlockingPassword}
+        onSubmit={handlePasswordSubmit}
+        onCancel={handlePasswordCancel}
+      />
+
       {/* Page Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
@@ -218,6 +275,8 @@ export const ReaderPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -409,6 +468,7 @@ export const ReaderPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="reader" toolName={t.nav.reader} />
     </div>
   );
 };

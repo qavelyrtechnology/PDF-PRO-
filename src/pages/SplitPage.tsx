@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   loadPdfJsDocument,
   parsePageRanges,
@@ -11,11 +16,12 @@ import {
   splitPdfEveryPage,
   downloadFile,
 } from '../services/pdfService';
-import JSZip from 'jszip';
+import { isCancelledError } from '../utils/fileUtils';
 import { Scissors, Download, Archive, HelpCircle } from 'lucide-react';
 
 export const SplitPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [splitMode, setSplitMode] = useState<'ranges' | 'all'>('ranges');
@@ -26,17 +32,21 @@ export const SplitPage: React.FC = () => {
   const [results, setResults] = useState<{ filename: string; bytes: Uint8Array }[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
     setResults([]);
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    let doc: Awaited<ReturnType<typeof loadPdfJsDocument>> | null = null;
     try {
-      const doc = await loadPdfJsDocument(selected);
+      doc = await loadPdfJsDocument(selected);
       setTotalPages(doc.numPages);
       // Default initial range recommendation
       setRangeInput(doc.numPages > 1 ? `1-${Math.min(2, doc.numPages)}` : '1');
@@ -44,11 +54,16 @@ export const SplitPage: React.FC = () => {
       console.error('Split load error:', err);
       setErrorMessage(t.reader.pageRenderError);
       setFile(null);
+    } finally {
+      await doc?.loadingTask?.destroy().catch(() => {});
     }
   };
 
   const handleSplit = async () => {
     if (!file || totalPages === 0) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -60,15 +75,27 @@ export const SplitPage: React.FC = () => {
       let outputFiles: { filename: string; bytes: Uint8Array }[] = [];
 
       if (splitMode === 'all') {
-        outputFiles = await splitPdfEveryPage(file, (pct) => setProgress(pct));
+        outputFiles = await splitPdfEveryPage(
+          file,
+          (pct) => setProgress(pct),
+          undefined,
+          controller.signal
+        );
       } else {
         const parsedRanges = parsePageRanges(rangeInput, totalPages);
         if (!parsedRanges) {
           setErrorMessage(t.split.invalidRangeError);
           setIsProcessing(false);
+          abortControllerRef.current = null;
           return;
         }
-        outputFiles = await splitPdfByRanges(file, parsedRanges, (pct) => setProgress(pct));
+        outputFiles = await splitPdfByRanges(
+          file,
+          parsedRanges,
+          (pct) => setProgress(pct),
+          undefined,
+          controller.signal
+        );
       }
 
       setResults(outputFiles);
@@ -76,9 +103,14 @@ export const SplitPage: React.FC = () => {
         t.split.extractedCount.replace('{count}', outputFiles.length.toString())
       );
     } catch (err: any) {
-      console.error('Split error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Split error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -93,6 +125,7 @@ export const SplitPage: React.FC = () => {
     setIsProcessing(true);
     setStatusText('Archiving split documents into ZIP file...');
     try {
+      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       results.forEach((item) => {
         zip.file(item.filename, item.bytes);
@@ -114,6 +147,9 @@ export const SplitPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="split" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -124,6 +160,8 @@ export const SplitPage: React.FC = () => {
           {t.split.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -161,6 +199,7 @@ export const SplitPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               setResults([]);
+              gate.clearNotices();
             }}
           />
 
@@ -258,7 +297,16 @@ export const SplitPage: React.FC = () => {
           {/* Progress Indicator */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={statusText} />
+              <ProgressBar
+                progress={progress}
+                statusText={statusText}
+                onCancel={
+                  abortControllerRef.current
+                    ? () => abortControllerRef.current?.abort()
+                    : undefined
+                }
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -306,6 +354,7 @@ export const SplitPage: React.FC = () => {
           )}
         </div>
       )}
+      <ToolSeoSection pageKey="split" toolName={t.nav.split} />
     </div>
   );
 };

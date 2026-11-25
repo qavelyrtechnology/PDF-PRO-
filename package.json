@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "description": "Professional, completely free & privacy-first PDF tools running 100% locally in-browser.",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "prebuild": "node scripts/fetch-assets.mjs",
+    "prebuild": "node scripts/fetch-assets.mjs && node scripts/generate-sitemap.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
@@ -17,6 +20,9 @@
   "dependencies": {
     "@fontsource-variable/cairo": "^5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "@pdfsmaller/pdf-decrypt": "^1.0.1",
+    "@pdfsmaller/pdf-encrypt": "^1.2.0",
+    "docx": "^9.16.0",
     "jszip": "^3.10.2",
     "lucide-react": "^0.546.0",
     "pdf-lib": "^1.17.1",

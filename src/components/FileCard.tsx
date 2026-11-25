@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
-import { formatBytes } from '../services/pdfService';
+import { formatBytes } from '../utils/fileUtils';
 import { FileText, Image as ImageIcon, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 
 interface FileCardProps {

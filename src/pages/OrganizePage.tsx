@@ -4,6 +4,11 @@ import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   loadPdfJsDocument,
   renderPdfPageToCanvas,
@@ -30,6 +35,7 @@ interface PageThumbnailItem {
 
 export const OrganizePage: React.FC = () => {
   const { t, isRtl } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState<number>(0);
@@ -45,9 +51,17 @@ export const OrganizePage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      pdfDoc?.loadingTask?.destroy().catch(() => {});
+    };
+  }, [pdfDoc]);
+
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
     setOrganizedPdfBytes(null);
     setErrorMessage(null);
@@ -164,6 +178,9 @@ export const OrganizePage: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="organize" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -174,6 +191,8 @@ export const OrganizePage: React.FC = () => {
           {t.organize.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -210,8 +229,10 @@ export const OrganizePage: React.FC = () => {
             pageCount={pageOrder.length}
             onRemove={() => {
               setFile(null);
+              setPdfDoc(null);
               setThumbnails([]);
               setPageOrder([]);
+              gate.clearNotices();
             }}
           />
 
@@ -276,9 +297,15 @@ export const OrganizePage: React.FC = () => {
             </div>
           </div>
 
+          {isProcessing && (
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <ProgressBar progress={progress} statusText={t.organize.savingProgress} />
+            </div>
+          )}
+
           {loadingThumbnails && (
             <div className="p-8 text-center text-xs text-slate-500 animate-pulse">
-              Generating page previews...
+              {t.common.loading}
             </div>
           )}
 
@@ -366,6 +393,7 @@ export const OrganizePage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="organize" toolName={t.nav.organize} />
     </div>
   );
 };

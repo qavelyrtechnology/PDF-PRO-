@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { loadPdfJsDocument, renderPdfPageToCanvas } from '../services/pdfService';
 import type * as pdfjsLib from 'pdfjs-dist';
 import {
@@ -17,6 +22,7 @@ import {
 
 export const ComparePage: React.FC = () => {
   const { t, isRtl } = useLanguage();
+  const gate = usePdfFileGate();
   const [fileA, setFileA] = useState<File | null>(null);
   const [fileB, setFileB] = useState<File | null>(null);
   const [docA, setDocA] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -30,28 +36,44 @@ export const ComparePage: React.FC = () => {
   const canvasARef = useRef<HTMLCanvasElement>(null);
   const canvasBRef = useRef<HTMLCanvasElement>(null);
 
+  useEffect(() => {
+    return () => {
+      docA?.loadingTask?.destroy().catch(() => {});
+    };
+  }, [docA]);
+
+  useEffect(() => {
+    return () => {
+      docB?.loadingTask?.destroy().catch(() => {});
+    };
+  }, [docB]);
+
   const handleFileASelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const f = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const f = ready[0];
     setFileA(f);
     try {
       const doc = await loadPdfJsDocument(f);
       setDocA(doc);
       setMaxPages((prev) => Math.max(prev, doc.numPages));
-    } catch (e) {
+    } catch {
       setErrorMessage('Could not load Document A.');
     }
   };
 
   const handleFileBSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const f = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const f = ready[0];
     setFileB(f);
     try {
       const doc = await loadPdfJsDocument(f);
       setDocB(doc);
       setMaxPages((prev) => Math.max(prev, doc.numPages));
-    } catch (e) {
+    } catch {
       setErrorMessage('Could not load Document B.');
     }
   };
@@ -88,6 +110,9 @@ export const ComparePage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="compare" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -98,6 +123,8 @@ export const ComparePage: React.FC = () => {
           {t.compare.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -215,6 +242,7 @@ export const ComparePage: React.FC = () => {
           )}
         </div>
       </div>
+      <ToolSeoSection pageKey="compare" toolName={t.nav.compare} />
     </div>
   );
 };

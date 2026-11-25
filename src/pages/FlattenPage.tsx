@@ -3,20 +3,28 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { flattenPdf, shareOrDownloadFile } from '../services/pdfService';
 import { Layers, Download, Share2, Info } from 'lucide-react';
 
 export const FlattenPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [flattenedBytes, setFlattenedBytes] = useState<Uint8Array | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleFileSelected = (files: File[]) => {
+  const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    setFile(files[0]);
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    setFile(ready[0]);
     setFlattenedBytes(null);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -44,6 +52,9 @@ export const FlattenPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="flatten" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -54,6 +65,8 @@ export const FlattenPage: React.FC = () => {
           {t.flatten.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 flex items-start gap-3 text-xs text-blue-900 dark:text-blue-200">
         <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
@@ -93,6 +106,7 @@ export const FlattenPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               setFlattenedBytes(null);
+              gate.clearNotices();
             }}
           />
 
@@ -135,6 +149,7 @@ export const FlattenPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="flatten" toolName={t.nav.flatten} />
     </div>
   );
 };

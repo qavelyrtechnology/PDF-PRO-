@@ -1,6 +1,0 @@
-{
-  "name": "Free PDF Studio",
-  "description": "Professional, completely free & privacy-first PDF tools. Merge, split, compress, read, annotate, OCR and convert PDFs 100% locally in your browser.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

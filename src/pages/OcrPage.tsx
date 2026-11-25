@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { performOcr, OcrLanguage } from '../services/ocrService';
 import { downloadFile } from '../services/pdfService';
-import { ScanText, Copy, Download, Check, AlertCircle, Info } from 'lucide-react';
+import { isCancelledError } from '../utils/fileUtils';
+import { ScanText, Copy, Download, Check, Info } from 'lucide-react';
 
 export const OcrPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState<OcrLanguage>('eng');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -18,17 +25,22 @@ export const OcrPage: React.FC = () => {
   const [extractedText, setExtractedText] = useState('');
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const handleFileSelected = (files: File[]) => {
+  const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
-    setFile(selected);
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    setFile(ready[0]);
     setExtractedText('');
     setErrorMessage(null);
   };
 
   const handleStartOcr = async () => {
     if (!file) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsProcessing(true);
     setProgress(5);
@@ -37,10 +49,16 @@ export const OcrPage: React.FC = () => {
     setExtractedText('');
 
     try {
-      const text = await performOcr(file, language, (info) => {
-        setProgress(info.progress);
-        setStatusText(info.status);
-      });
+      const text = await performOcr(
+        file,
+        language,
+        (info) => {
+          setProgress(info.progress);
+          setStatusText(info.status);
+        },
+        controller.signal,
+        t.ocr.downloadingLangData
+      );
 
       if (!text.trim()) {
         setErrorMessage(t.ocr.noTextFound);
@@ -48,11 +66,16 @@ export const OcrPage: React.FC = () => {
         setExtractedText(text);
       }
     } catch (err: any) {
-      console.error('OCR failure:', err);
-      setErrorMessage(
-        'OCR failed to complete. Please ensure language data can be retrieved and the document is legible.'
-      );
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('OCR failure:', err);
+        setErrorMessage(
+          'OCR failed to complete. Please ensure language data can be retrieved and the document is legible.'
+        );
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -77,6 +100,9 @@ export const OcrPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="ocr" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -96,6 +122,8 @@ export const OcrPage: React.FC = () => {
           <p className="leading-relaxed opacity-90">{t.ocr.ocrNotice}</p>
         </div>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -126,6 +154,7 @@ export const OcrPage: React.FC = () => {
             onRemove={() => {
               setFile(null);
               setExtractedText('');
+              gate.clearNotices();
             }}
           />
 
@@ -187,7 +216,12 @@ export const OcrPage: React.FC = () => {
           {/* Progress Bar */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={statusText} />
+              <ProgressBar
+                progress={progress}
+                statusText={statusText}
+                onCancel={() => abortControllerRef.current?.abort()}
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -240,6 +274,7 @@ export const OcrPage: React.FC = () => {
           )}
         </div>
       )}
+      <ToolSeoSection pageKey="ocr" toolName={t.nav.ocr} />
     </div>
   );
 };

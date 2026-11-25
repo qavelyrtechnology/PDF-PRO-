@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { mergePdfs, downloadFile } from '../services/pdfService';
-import { Layers, Download, Plus, Trash2, ArrowRight } from 'lucide-react';
+import { isCancelledError } from '../utils/fileUtils';
+import { Layers, Download, Trash2, ArrowRight } from 'lucide-react';
 
 export const MergePage: React.FC = () => {
   const { t, isRtl } = useLanguage();
+  const gate = usePdfFileGate();
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -16,8 +23,9 @@ export const MergePage: React.FC = () => {
   const [mergedPdfBytes, setMergedPdfBytes] = useState<Uint8Array | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const handleFilesSelected = (newFiles: File[]) => {
+  const handleFilesSelected = async (newFiles: File[]) => {
     setErrorMessage(null);
     setSuccessMessage(null);
     setMergedPdfBytes(null);
@@ -32,7 +40,10 @@ export const MergePage: React.FC = () => {
       return;
     }
 
-    setFiles((prev) => [...prev, ...valid]);
+    const ready = await gate.prepareFiles(valid);
+    if (ready.length > 0) {
+      setFiles((prev) => [...prev, ...ready]);
+    }
   };
 
   const handleMoveUp = (index: number) => {
@@ -67,6 +78,7 @@ export const MergePage: React.FC = () => {
     setMergedPdfBytes(null);
     setErrorMessage(null);
     setSuccessMessage(null);
+    gate.clearNotices();
   };
 
   const handleMerge = async () => {
@@ -75,6 +87,9 @@ export const MergePage: React.FC = () => {
       return;
     }
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsProcessing(true);
     setProgress(10);
     setStatusText(t.merge.mergingProgress);
@@ -82,15 +97,24 @@ export const MergePage: React.FC = () => {
     setSuccessMessage(null);
 
     try {
-      const bytes = await mergePdfs(files, (pct) => {
-        setProgress(pct);
-      });
+      const bytes = await mergePdfs(
+        files,
+        (pct) => {
+          setProgress(pct);
+        },
+        controller.signal
+      );
       setMergedPdfBytes(bytes);
       setSuccessMessage(t.merge.mergedSuccess);
     } catch (err: any) {
-      console.error('Merge error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Merge error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -103,6 +127,9 @@ export const MergePage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="merge" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -113,6 +140,8 @@ export const MergePage: React.FC = () => {
           {t.merge.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -181,7 +210,12 @@ export const MergePage: React.FC = () => {
           {/* Progress bar during merge */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={statusText} />
+              <ProgressBar
+                progress={progress}
+                statusText={statusText}
+                onCancel={() => abortControllerRef.current?.abort()}
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -210,6 +244,7 @@ export const MergePage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="merge" toolName={t.nav.merge} />
     </div>
   );
 };

@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect, PointerEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { StatusBanner } from '../components/StatusBanner';
+import { ProgressBar } from '../components/ProgressBar';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { PasswordModal } from '../components/PasswordModal';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import {
   loadPdfJsDocument,
   renderPdfPageToCanvas,
@@ -10,6 +16,7 @@ import {
   RedactionRect,
   PageRedaction,
 } from '../services/pdfService';
+import { isCancelledError } from '../utils/fileUtils';
 import type * as pdfjsLib from 'pdfjs-dist';
 import {
   EyeOff,
@@ -25,6 +32,7 @@ import {
 
 export const RedactPage: React.FC = () => {
   const { t, isRtl } = useLanguage();
+  const gate = usePdfFileGate();
   const [file, setFile] = useState<File | null>(null);
   const [pdfDoc, setPdfDoc] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,16 +48,26 @@ export const RedactPage: React.FC = () => {
   const [currentRect, setCurrentRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [redactedPdfBytes, setRedactedPdfBytes] = useState<Uint8Array | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      pdfDoc?.loadingTask?.destroy().catch(() => {});
+    };
+  }, [pdfDoc]);
 
   const handleFileSelected = async (files: File[]) => {
     if (files.length === 0) return;
-    const selected = files[0];
+    const ready = await gate.prepareFiles([files[0]]);
+    if (ready.length === 0) return;
+    const selected = ready[0];
     setFile(selected);
     setRedactedPdfBytes(null);
     setErrorMessage(null);
@@ -272,30 +290,41 @@ export const RedactPage: React.FC = () => {
   const handleApplyRedactions = async () => {
     if (!file) return;
 
+    const items: PageRedaction[] = [];
+    pageRedactions.forEach((rects, pageIndex) => {
+      if (rects.length > 0) items.push({ pageIndex, rects });
+    });
+
+    if (items.length === 0) {
+      setErrorMessage(t.redact.noMarksWarning);
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsProcessing(true);
+    setProgress(10);
     setErrorMessage(null);
 
     try {
-      const items: PageRedaction[] = [];
-      pageRedactions.forEach((rects, pageIndex) => {
-        if (rects.length > 0) items.push({ pageIndex, rects });
+      const bytes = await redactPdf(file, items, {
+        onProgress: (pct) => setProgress(pct),
+        signal: controller.signal,
       });
-
-      if (items.length === 0) {
-        setErrorMessage(t.redact.noMarksWarning);
-        setIsProcessing(false);
-        return;
-      }
-
-      const bytes = await redactPdf(file, items);
       setRedactedPdfBytes(bytes);
       setSuccessMessage(t.redact.success);
       const baseName = file.name.replace(/\.pdf$/i, '');
       shareOrDownloadFile(bytes, `${baseName}_redacted.pdf`);
     } catch (err: any) {
-      console.error('Redact error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Redact error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -308,6 +337,9 @@ export const RedactPage: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="redact" />
+      <PasswordModal {...gate.passwordModalProps} />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -318,6 +350,8 @@ export const RedactPage: React.FC = () => {
           {t.redact.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {/* Honest Security Notice */}
       <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 flex items-start gap-3 text-xs text-slate-800 dark:text-slate-200">
@@ -544,8 +578,20 @@ export const RedactPage: React.FC = () => {
               )}
             </div>
           </div>
+          {isProcessing && (
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <ProgressBar
+                progress={progress}
+                statusText={t.common.processing}
+                onCancel={() => abortControllerRef.current?.abort()}
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
+            </div>
+          )}
         </div>
       )}
+
+      <ToolSeoSection pageKey="redact" toolName={t.nav.redact} />
     </div>
   );
 };

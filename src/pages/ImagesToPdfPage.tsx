@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { DropZone } from '../components/DropZone';
 import { FileCard } from '../components/FileCard';
 import { ProgressBar } from '../components/ProgressBar';
 import { StatusBanner } from '../components/StatusBanner';
+import { PageSeo } from '../components/PageSeo';
+import { ToolSeoSection } from '../components/ToolSeoSection';
+import { FileGateAlerts } from '../components/FileGateAlerts';
+import { usePdfFileGate } from '../hooks/usePdfFileGate';
 import { imagesToPdf, downloadFile } from '../services/pdfService';
+import { isCancelledError } from '../utils/fileUtils';
 import { Image as ImageIcon, Download, Settings, Trash2 } from 'lucide-react';
 
 interface ImageItem {
@@ -14,6 +19,7 @@ interface ImageItem {
 
 export const ImagesToPdfPage: React.FC = () => {
   const { t } = useLanguage();
+  const gate = usePdfFileGate();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [pageSize, setPageSize] = useState<'a4' | 'letter' | 'fit'>('a4');
   const [orientation, setOrientation] = useState<'auto' | 'portrait' | 'landscape'>('auto');
@@ -23,20 +29,24 @@ export const ImagesToPdfPage: React.FC = () => {
   const [generatedPdfBytes, setGeneratedPdfBytes] = useState<Uint8Array | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleFilesSelected = (files: File[]) => {
     setErrorMessage(null);
     setSuccessMessage(null);
     setGeneratedPdfBytes(null);
 
-    const validFiles = files.filter(
+    const allowed = gate.checkFileSizes(files);
+    const validFiles = allowed.filter(
       (f) =>
         f.type.startsWith('image/') ||
         /\.(jpe?g|png|webp|bmp)$/i.test(f.name)
     );
 
     if (validFiles.length === 0) {
-      setErrorMessage('Please select valid image files (JPG, PNG, WebP).');
+      if (allowed.length > 0) {
+        setErrorMessage('Please select valid image files (JPG, PNG, WebP).');
+      }
       return;
     }
 
@@ -82,10 +92,14 @@ export const ImagesToPdfPage: React.FC = () => {
     setGeneratedPdfBytes(null);
     setErrorMessage(null);
     setSuccessMessage(null);
+    gate.clearNotices();
   };
 
   const handleGeneratePdf = async () => {
     if (images.length === 0) return;
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsProcessing(true);
     setProgress(10);
@@ -100,15 +114,21 @@ export const ImagesToPdfPage: React.FC = () => {
           orientation,
           margin,
         },
-        (pct) => setProgress(pct)
+        (pct) => setProgress(pct),
+        controller.signal
       );
 
       setGeneratedPdfBytes(pdfBytes);
       setSuccessMessage('PDF created successfully from selected images!');
     } catch (err: any) {
-      console.error('Image to PDF error:', err);
-      setErrorMessage(err?.message || t.common.error);
+      if (isCancelledError(err)) {
+        setErrorMessage(t.fileLimits.cancelledNotice);
+      } else {
+        console.error('Image to PDF error:', err);
+        setErrorMessage(err?.message || t.common.error);
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsProcessing(false);
     }
   };
@@ -120,6 +140,8 @@ export const ImagesToPdfPage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <PageSeo pageKey="imagesToPdf" />
+
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -130,6 +152,8 @@ export const ImagesToPdfPage: React.FC = () => {
           {t.imagesToPdf.subtitle}
         </p>
       </div>
+
+      <FileGateAlerts warning={gate.sizeWarning} error={gate.blockError} />
 
       {errorMessage && (
         <StatusBanner
@@ -258,7 +282,12 @@ export const ImagesToPdfPage: React.FC = () => {
           {/* Progress */}
           {isProcessing && (
             <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <ProgressBar progress={progress} statusText={t.imagesToPdf.generatingProgress} />
+              <ProgressBar
+                progress={progress}
+                statusText={t.imagesToPdf.generatingProgress}
+                onCancel={() => abortControllerRef.current?.abort()}
+                cancelLabel={t.fileLimits.cancelOperation}
+              />
             </div>
           )}
 
@@ -286,6 +315,7 @@ export const ImagesToPdfPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ToolSeoSection pageKey="imagesToPdf" toolName={t.nav.imagesToPdf} />
     </div>
   );
 };
